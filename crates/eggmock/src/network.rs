@@ -1,16 +1,20 @@
-use egg::{Analysis, EGraph, Id, Language, RecExpr};
+use egg::Language;
 
-pub trait Node {
+pub trait Network: From<Self::Language> {
+    type GateType: GateType<Network = Self>;
+    type Language: Language + From<Self>;
+    type TransferFFI: TransferFFI<Network = Self>;
+
     const TYPENAME: &'static str;
+    const GATE_TYPES: &'static [Self::GateType];
 
-    type Variants: NodeType<Language = Self>;
-    const TYPES: &'static [Self::Variants];
+    fn map_ids(&self, map: impl Fn(u64) -> u64) -> Self;
 
     fn c_ffi() -> String {
         let typename = Self::TYPENAME;
 
         let mut fields = "uint64_t ( *add_symbol )( void* data, uint64_t name );".to_string();
-        for variant in Self::TYPES {
+        for variant in Self::GATE_TYPES {
             fields += "\n  uint64_t ( *add_";
             fields += variant.name();
             fields += " )( void* data";
@@ -56,30 +60,27 @@ struct eggmock_{typename}_ffi_callback
     }
 }
 
-pub trait NodeType: Sized + 'static {
-    type Language: Node<Variants = Self>;
-
-    // const MOCKTURTLE_CREATE_METHOD: &'static str;
-    // const MOCKTURTLE_IS_METHOD: &'static str;
+pub trait GateType: Sized + 'static {
+    type Network: Network<GateType = Self>;
 
     fn name(&self) -> &'static str;
     fn fanin(&self) -> u8;
+
+    fn mockturtle_create(&self) -> &'static str;
+    fn mockturtle_is(&self) -> &'static str;
 }
 
-pub trait Rewriter: Sized {
-    type Network: Node + Language;
-    type Analysis: Analysis<Self::Network>;
-
-    fn create_analysis(&mut self) -> Self::Analysis;
-
-    fn rewrite(
-        &mut self,
-        egraph: EGraph<Self::Network, Self::Analysis>,
-        roots: impl Iterator<Item = Id>,
-    ) -> RewriterResult<Self>;
+pub trait NetworkTransfer<N: Network> {
+    fn create(&mut self, node: N) -> u64;
 }
 
-pub struct RewriterResult<R: Rewriter> {
-    pub expr: RecExpr<R::Network>,
-    pub roots: Vec<Id>,
+pub trait TransferFFI {
+    type Network: Network;
+
+    fn new<T: AsNetworkTransfer<Self::Network>>() -> Self;
+    fn create(&self, data: *mut libc::c_void, node: Self::Network) -> u64;
+}
+
+pub trait AsNetworkTransfer<N: Network> {
+    fn as_transfer(&mut self) -> &mut impl NetworkTransfer<N>;
 }

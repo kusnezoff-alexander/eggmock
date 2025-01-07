@@ -10,3 +10,4 @@ egg = { workspace = true }
 libc = { workspace = true }
 paste = { workspace = true }
 seq-macro = { workspace = true }
+indoc = { workspace = true }

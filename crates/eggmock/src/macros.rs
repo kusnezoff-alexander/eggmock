@@ -1,192 +1,190 @@
-
 #[macro_export]
 macro_rules! define_network {
-    ($(#[$meta:meta])* $vis:vis enum $name_str:literal = $name:ident {
-        $($variant_str:literal = $variant:ident($count:literal)),+
+    ($(#[$meta:meta])* $vis:vis enum $name:ident {
+        $($gate_str:literal = $gate:ident($fanin:literal, $mockturtle_create:ident, $mockturtle_is:ident)),+
     }) => {
         $crate::paste::paste! {
             $crate::egg::define_language! {
                 $(#[$meta])*
-                $vis enum $name {
+                $vis enum [<$name Language>] {
                     Symbol(u64),
-                    $($variant_str = $variant([$crate::egg::Id;$count])),+,
+                    Const(bool),
+                    "!" = Not($crate::egg::Id),
+                    $($gate_str = $gate([$crate::egg::Id;$fanin])),+,
                 }
             }
 
-            impl $crate::Node for $name {
-                const TYPENAME: &'static str = $name_str;
-                type Variants = $crate::paste::paste!([<$name Variant>]);
+            $vis enum $name {
+                Symbol(u64),
+                Const(bool),
+                Not(u64),
+                $($gate([u64;$fanin])),+
+            }
 
-                const TYPES: &'static [Self::Variants] = &[
-                    $([<$name Variant>]::$variant),+
+            impl $crate::Network for $name {
+                type GateType = $crate::paste::paste!([<$name GateType>]);
+                type Language = [<$name Language>];
+                type TransferFFI = [<$name TransferFFI>];
+
+                const TYPENAME: &'static str = stringify!([<$name:snake:lower>]);
+                const GATE_TYPES: &'static [Self::GateType] = &[
+                    $([<$name GateType>]::$gate),+
                 ];
+
+                fn map_ids(&self, map: impl Fn(u64) -> u64) -> Self {
+                    match self {
+                        Self::Symbol(name) => Self::Symbol(*name),
+                        Self::Const(bool) => Self::Const(*bool),
+                        Self::Not(id) => Self::Not(map(*id)),
+                        $(Self::$gate(ids) => {
+                            $crate::seq_macro::seq!(N in 0..$fanin {
+                                Self::$gate([#(map(ids[N]),)*])
+                            })
+                        }),+
+                    }
+                }
             }
 
             #[derive(Copy, Clone, Eq, PartialEq, Hash)]
-            $vis enum [<$name Variant>] {
-                $($variant),+
+            $vis enum [<$name GateType>] {
+                $($gate),+
             }
 
-            impl $crate::NodeType for [<$name Variant>] {
-                type Language = $name;
+            impl $crate::GateType for [<$name GateType>] {
+                type Network = $name;
 
                 fn name(&self) -> &'static str {
                     match self {
-                        $(Self::$variant => stringify!([<$variant:snake:lower>])),+
+                        $(Self::$gate => stringify!([<$gate:snake:lower>])),+
                     }
                 }
 
                 fn fanin(&self) -> u8 {
                     match self {
-                        $(Self::$variant => $count),+
+                        $(Self::$gate => $fanin),+
+                    }
+                }
+
+                fn mockturtle_create(&self) -> &'static str {
+                    match self {
+                        $(Self::$gate => stringify!($mockturtle_create)),+
+                    }
+                }
+
+                fn mockturtle_is(&self) -> &'static str {
+                    match self {
+                        $(Self::$gate => stringify!($mockturtle_is)),+
                     }
                 }
             }
 
-            mod [<_eggmock_ $name:snake:lower _ffi>] {
-                use super::*;
-                pub struct Data<R: $crate::Rewriter<Network = $name>> {
-                    graph: Option<$crate::egg::EGraph<$name, R::Analysis>>,
-                    rewriter: R,
+            impl From<$name> for [<$name Language>] {
+                fn from(node: $name) -> Self {
+                    match node {
+                        $name::Symbol(name) => Self::Symbol(name),
+                        $name::Const(value) => Self::Const(value),
+                        $name::Not(id) => Self::Not($crate::egg::Id::from(id as usize)),
+                        $($name::$gate(ids) => {
+                            $crate::seq_macro::seq!(N in 0..$fanin {
+                                Self::$gate([#($crate::egg::Id::from(ids[N] as usize),)*])
+                            })
+                        }),+
+                    }
                 }
+            }
 
-                impl<R: $crate::Rewriter<Network = $name>> Data<R> {
-                    pub fn new(mut rewriter: R) -> Self {
-                        Self {
-                            graph: Some($crate::egg::EGraph::new(rewriter.create_analysis())),
-                            rewriter
-                        }
+            impl From<[<$name Language>]> for $name {
+                fn from(node: [<$name Language>]) -> Self {
+                    match node {
+                        [<$name Language>]::Symbol(name) => Self::Symbol(name),
+                        [<$name Language>]::Const(value) => Self::Const(value),
+                        [<$name Language>]::Not(id) => Self::Not(usize::from(id) as u64),
+                        $([<$name Language>]::$gate(ids) => {
+                            $crate::seq_macro::seq!(N in 0..$fanin {
+                                Self::$gate([#(usize::from(ids[N]) as u64,)*])
+                            })
+                        }),+
+                    }
+                }
+            }
+
+            impl<A> $crate::NetworkTransfer<$name> for $crate::egg::EGraph<[<$name Language>], A>
+            where
+                A: $crate::egg::Analysis<[<$name Language>]>
+            {
+                fn create(&mut self, node: $name) -> u64 {
+                    usize::from(self.add([<$name Language>]::from(node))) as u64
+                }
+            }
+
+            #[repr(C)]
+            $vis struct [<$name TransferFFI>] {
+                pub create_symbol: extern "C" fn(*mut $crate::libc::c_void, name: u64) -> u64,
+                pub create_constant: extern "C" fn (*mut $crate::libc::c_void, value: bool) -> u64,
+                pub create_not: extern "C" fn (*mut $crate::libc::c_void, id: u64) -> u64,
+                $(pub [<create_ $gate:snake:lower>]: $crate::seq_macro::seq!(N in 1..=$fanin {
+                     extern "C" fn(*mut $crate::libc::c_void, #(id~N: u64,)*) -> u64
+                })),+,
+            }
+
+            impl TransferFFI for [<$name TransferFFI>] {
+                type Network = $name;
+
+                fn new<T: $crate::AsNetworkTransfer<Self::Network> + Sized>() -> Self {
+                    Self {
+                        create_symbol: Self::create_symbol::<T>,
+                        create_constant: Self::create_constant::<T>,
+                        create_not: Self::create_not::<T>,
+                        $([<create_ $gate:snake:lower>]: Self::[<create_ $gate:snake:lower>]::<T>),+,
                     }
                 }
 
-                pub extern "C" fn add_symbol<R: $crate::Rewriter<Network = $name>>(
+                fn create(&self, data: *mut libc::c_void, node: $name) -> u64 {
+                    match node {
+                        $name::Symbol(name) => (self.create_symbol)(data, name),
+                        $name::Const(value) => (self.create_constant)(data, value),
+                        $name::Not(id) => (self.create_not)(data, id),
+                        $($name::$gate(ids) => {
+                            $crate::seq_macro::seq!(N in 0..$fanin {
+                                (self.[<create_ $gate:snake:lower>])(data, #(ids[N],)*)
+                            })
+                        }),+
+                    }
+                }
+            }
+
+            impl [<$name TransferFFI>] {
+                extern "C" fn create_symbol<T: $crate::AsNetworkTransfer<$name> + Sized>(
                     data: *mut $crate::libc::c_void,
                     name: u64
                 ) -> u64 {
-                    let graph = &mut unsafe { &mut *(data as *mut Data<R>) }.graph;
-                    usize::from(graph.as_mut().unwrap().add($name::Symbol(name))) as u64
+                    unsafe { &mut *(data as *mut T) }.as_transfer().create($name::Symbol(name))
                 }
-                $($crate::seq_macro::seq!(N in 1..=$count {
-                    pub extern "C" fn [<add_ $variant:snake:lower>]<R>(
-                        data: *mut $crate::libc::c_void,
-                        #(id~N: u64,)*
-                    ) -> u64
-                    where
-                        R: $crate::Rewriter<Network = $name>
-                    {
-                        let graph = &mut unsafe { &mut *(data as *mut Data<R>) }.graph;
-                        usize::from(
-                            graph
-                                .as_mut()
-                                .unwrap()
-                                .add($name::$variant([#($crate::egg::Id::from(id~N as usize),)*]))
-                        ) as u64
+
+                extern "C" fn create_constant<T: $crate::AsNetworkTransfer<$name> + Sized>(
+                    data: *mut $crate::libc::c_void,
+                    value: bool
+                ) -> u64 {
+                    unsafe { &mut *(data as *mut T) }.as_transfer().create($name::Const(value))
+                }
+
+                extern "C" fn create_not<T: $crate::AsNetworkTransfer<$name> + Sized>(
+                    data: *mut $crate::libc::c_void,
+                    id: u64
+                ) -> u64 {
+                    unsafe { &mut *(data as *mut T) }.as_transfer().create($name::Not(id))
+                }
+
+                $($crate::seq_macro::seq!(N in 1..=$fanin {
+                    pub extern "C" fn [<create_ $gate:snake:lower>]<T: $crate::AsNetworkTransfer<$name> + Sized>(
+                        data: *mut $crate::libc::c_void
+                        #(, id~N: u64)*
+                    ) -> u64 {
+                        unsafe { &mut *(data as *mut T) }
+                            .as_transfer()
+                            .create($name::$gate([#(id~N,)*]))
                     }
                 });)+
-                pub extern "C" fn rewrite<R: $crate::Rewriter<Network = $name>>(
-                    data: *mut $crate::libc::c_void,
-                    roots_size: $crate::libc::size_t,
-                    roots: *const u64,
-                    callback: [<$name RewriterCallback>]
-                ) {
-                    let roots = unsafe { std::slice::from_raw_parts(roots, roots_size as usize) };
-                    let roots = roots.iter().map(|root| $crate::egg::Id::from(*root as usize));
-                    let data = unsafe { &mut *(data as *mut Data<R>) };
-                    let result = data.rewriter.rewrite(data.graph.take().unwrap(), roots);
-                    let mut node_ids = std::collections::HashMap::new();
-                    for (id, node) in result.expr.items() {
-                        let node_id = match node {
-                            $name::Symbol(name) => callback.add_symbol(*name),
-                            $(
-                                #[allow(unused_variables)]
-                                $name::$variant(children) => {
-                                    let mapped_children = $crate::seq_macro::seq!(N in 0..$count {
-                                        [ #(*node_ids.get(&children[N]).unwrap(),)* ]
-                                    });
-                                    callback.[<add_ $variant:snake:lower>](mapped_children)
-                                }
-                            ),+
-                        };
-                        node_ids.insert(id, node_id);
-                    }
-                    let roots = Vec::from_iter(
-                        result.roots.iter().map(|root| *node_ids.get(&root).unwrap())
-                    );
-                    callback.mark_roots(roots.as_slice());
-                    data.graph = Some($crate::egg::EGraph::new(data.rewriter.create_analysis()));
-                }
-
-                pub extern "C" fn free<R: $crate::Rewriter<Network = $name>>(
-                    data: *mut $crate::libc::c_void
-                ) {
-                    unsafe { let _ = Box::from_raw(data as *mut Data<R>); }
-                }
-            }
-
-            #[repr(C)]
-            $vis struct [<$name RewriterFFI>] {
-                data: *mut $crate::libc::c_void,
-                add_symbol: extern "C" fn(*mut $crate::libc::c_void, name: u64) -> u64,
-                $([<add_ $variant:snake:lower>]: $crate::seq_macro::seq!(N in 1..=$count {
-                     extern "C" fn(*mut $crate::libc::c_void, #(id~N: u64,)*) -> u64
-                })),+,
-                rewrite: extern "C" fn(
-                    *mut $crate::libc::c_void,
-                    roots_size: $crate::libc::size_t,
-                    roots: *const u64,
-                    callback: [<$name RewriterCallback>]
-                ),
-                free: extern "C" fn (*mut $crate::libc::c_void)
-            }
-
-            impl [<$name RewriterFFI>] {
-                pub fn new<R: Rewriter<Network = $name>>(rewriter: R) -> Self {
-                    type Data<R> = [<_eggmock_ $name:snake:lower _ffi>]::Data::<R>;
-                    let b = Box::new(Data::<R>::new(rewriter));
-                    let ptr = Box::into_raw(b);
-                    Self {
-                        data: ptr as *mut $crate::libc::c_void,
-                        add_symbol: [<_eggmock_ $name:snake:lower _ffi>]::add_symbol::<R>,
-                        $(
-                            [<add_ $variant:snake:lower>]: [<_eggmock_ $name:snake:lower _ffi>]
-                                ::[<add_ $variant:snake:lower>]::<R>
-                        ),+,
-                        rewrite: [<_eggmock_ $name:snake:lower _ffi>]::rewrite::<R>,
-                        free: [<_eggmock_ $name:snake:lower _ffi>]::free::<R>
-                    }
-                }
-            }
-
-            #[derive(Copy, Clone)]
-            #[repr(C)]
-            $vis struct [<$name RewriterCallback>] {
-                data: *mut $crate::libc::c_void,
-                add_symbol: extern "C" fn(*mut $crate::libc::c_void, name: u64) -> u64,
-                $([<add_ $variant:snake:lower>]: $crate::seq_macro::seq!(N in 1..=$count {
-                     extern "C" fn(*mut $crate::libc::c_void, #(id~N: u64,)*) -> u64
-                })),+,
-                mark_roots: extern "C" fn(
-                    *mut $crate::libc::c_void,
-                    roots_size: $crate::libc::size_t,
-                    roots: *const u64
-                ),
-            }
-
-            impl [<$name RewriterCallback>] {
-                pub fn add_symbol(&self, name: u64) -> u64 {
-                    (self.add_symbol)(self.data, name)
-                }
-                $(
-                    #[allow(unused_variables)]
-                    pub fn [<add_ $variant:snake:lower>](&self, children: [u64;$count]) -> u64 {
-                        $crate::seq_macro::seq!(N in 0..$count {
-                            (self.[<add_ $variant:snake:lower>])(self.data, #(children[N],)*)
-                        })
-                    }
-                )+
-                pub fn mark_roots(&self, roots: &[u64]) {
-                    (self.mark_roots)(self.data, roots.len(), roots.as_ptr())
-                }
             }
         }
     };

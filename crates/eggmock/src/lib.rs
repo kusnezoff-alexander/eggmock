@@ -1,27 +1,38 @@
-mod network;
 mod macros;
+mod network;
+mod rewrite;
+mod gen;
 
-pub use paste;
 pub use egg;
 pub use libc;
+pub use paste;
 pub use seq_macro;
 
 pub use network::*;
+pub use rewrite::*;
 
 define_network! {
-    pub enum "mig" = Mig {
-        "t" = True(0),
-        "f" = False(0),
-        "!" = Not(1),
-        "m" = Maj(3)
+    pub enum MIG {
+        "maj" = Maj(3, create_maj, is_maj)
     }
 }
 
 define_network! {
-    pub enum "aig" = Aig {
-        "t" = True(0),
-        "f" = False(0),
-        "!" = Not(1),
-        "a" = And(2)
+    pub enum AIG {
+        "*" = And(3, create_and, is_and)
+    }
+}
+
+define_network! {
+    pub enum XAG {
+        "*" = And(3, create_and, is_and),
+        "xor" = Xor(3, create_xor, is_xor)
+    }
+}
+
+define_network! {
+    pub enum XMG {
+        "xor" = Xor(2, create_xor, is_xor),
+        "maj" = Maj(3, create_maj, is_maj)
     }
 }

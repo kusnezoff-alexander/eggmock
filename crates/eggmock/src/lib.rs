@@ -1,7 +1,7 @@
 mod macros;
 mod network;
 mod rewrite;
-mod gen;
+pub mod gen;
 
 pub use egg;
 pub use libc;
@@ -12,26 +12,26 @@ pub use network::*;
 pub use rewrite::*;
 
 define_network! {
-    pub enum MIG {
+    pub enum Mig {
         "maj" = Maj(3, create_maj, is_maj)
     }
 }
 
 define_network! {
-    pub enum AIG {
+    pub enum Aig {
         "*" = And(3, create_and, is_and)
     }
 }
 
 define_network! {
-    pub enum XAG {
+    pub enum Xag {
         "*" = And(3, create_and, is_and),
         "xor" = Xor(3, create_xor, is_xor)
     }
 }
 
 define_network! {
-    pub enum XMG {
+    pub enum Xmg {
         "xor" = Xor(2, create_xor, is_xor),
         "maj" = Maj(3, create_maj, is_maj)
     }

@@ -71,6 +71,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "eggmock-example-mig"
+version = "0.0.0"
+dependencies = [
+ "eggmock",
+]
+
+[[package]]
 name = "eggmock-gen"
 version = "0.0.1-snapshot"
 dependencies = [

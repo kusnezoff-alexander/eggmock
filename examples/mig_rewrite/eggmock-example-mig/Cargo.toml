@@ -1,0 +1,9 @@
+[package]
+name = "eggmock-example-mig"
+edition = "2021"
+
+[dependencies]
+eggmock = { path = "../../../crates/eggmock" }
+
+[lib]
+crate-type = ["cdylib"]

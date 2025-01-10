@@ -6,10 +6,8 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 
-[workspace]
-
 [dependencies]
-eggmock = { path = "../../../crates/eggmock" }
+eggmock = { path = "../../.." }
 
 [build-dependencies]
-eggmock = { path = "../../../crates/eggmock" }
+eggmock = { path = "../../.." }

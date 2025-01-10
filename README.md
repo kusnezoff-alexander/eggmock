@@ -1,25 +1,31 @@
 # eggmock
 
-## FFI
+eggmock provides facilities to
+- transfer and receive logic networks from [**mock**turtle](https://github.com/lsils/mockturtle) to and from Rust code with an automatically generated FFI and
+- rewrite them using the [**egg**](https://github.com/egraphs-good/egg) library.
 
-Stage 1: transfer to E-Graph:
-* `eggmock_[ntk_type]_rewriter(name) -> Rewriter`
+Currently, eggmock supports AIGs, MIGs, XMGs and XAGs.
 
-```c++
-struct Rewriter {
-    void* (*create)(),
-    uint64_t add_symbol(void*),
-    uint64_t add_node_[type](void*, uint64_t const[])
-    void (*rewrite)(void*, RewriteCallback callbacks)
-}
+## Prerequisites
+
+To use eggmock, you need
+- a modern C++ compiler and CMake 
+- a working Rust installation
+
+If you want to test out if everything works as intended, you can run an example:
+
+```shell
+mkdir build
+cd build
+cmake ..
+make mig_rewrite
+./examples/mig_rewrite/mig_rewrite
 ```
 
-Stage 2: perform E-Rewriting and get back result:
-* `eggmock_[ntk_type]_rewrite(Ntk, NetworkCallbacks)`
-```c++
-struct NetworkCallbacks {
-    void* data,
-    uint64_t add_symbol(void*),
-    uint64_t add_node_[type](void*, uint64_t const[])y
-}
-```
+This will create two files:
+- `in.dot` contains the logic network that was passed from mockturtle to egg
+- `out.dot` contains the rewritten logic network
+
+## Notes
+
+Make sure to run a release build when measuring performance.

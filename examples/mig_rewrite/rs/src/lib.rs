@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::rc::Rc;
-use eggmock::egg::{rewrite, CostFunction, EGraph, Id, Language, Pattern, Runner};
+use eggmock::egg::{rewrite, CostFunction, EGraph, Id, Language, Runner};
 use eggmock::{Mig, MigLanguage, Network, RewriteFFI, Rewriter, RewriterResult};
 use std::time::Duration;
 

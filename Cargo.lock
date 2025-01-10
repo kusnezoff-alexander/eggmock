@@ -61,20 +61,13 @@ dependencies = [
 
 [[package]]
 name = "eggmock"
-version = "0.0.1-snapshot"
+version = "0.0.1-alpha"
 dependencies = [
  "egg",
  "indoc",
  "libc",
  "paste",
  "seq-macro",
-]
-
-[[package]]
-name = "eggmock-gen"
-version = "0.0.1-snapshot"
-dependencies = [
- "eggmock",
 ]
 
 [[package]]

@@ -1,19 +1,29 @@
 #include "eggmock.h"
 #include <mockturtle/mockturtle.hpp>
 
+using namespace mockturtle;
+using namespace eggmock;
+
 extern "C"
 {
-  extern eggmock::mig_rewrite example_mig_rewrite();
+  extern mig_rewrite example_mig_rewrite();
 }
 
 int main()
 {
-  mockturtle::mig_network network;
-  auto pi0 = network.create_pi();
-  auto pi1 = network.create_pi();
-  auto pi2 = network.create_pi();
+  mig_network in;
+  const auto b_i = in.create_pi();
+  const auto b_i_next = in.create_pi();
+  const auto m = in.create_pi();
 
-  auto sig1 = network.create_or( pi0, pi1 );
-  auto sig2 = network.create_and( network.create_not( sig1 ), pi2 );
-  auto out = rewrite_mig( network, example_mig_rewrite() );
+  const auto O1 = in.create_and( m, b_i_next);
+  const auto O2 = in.create_and( in.create_not(m), b_i );
+  const auto bi = in.create_or( O1, O2 );
+  in.create_po( bi );
+
+  write_dot( in, "in.dot" );
+
+  mig_network out = rewrite_mig( in, example_mig_rewrite() );
+
+  write_dot( out, "out.dot" );
 }

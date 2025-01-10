@@ -71,13 +71,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "eggmock-example-mig"
-version = "0.0.1"
-dependencies = [
- "eggmock",
-]
-
-[[package]]
 name = "env_logger"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -146,6 +139,13 @@ name = "log"
 version = "0.4.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
+
+[[package]]
+name = "mig-rewrite-rs"
+version = "0.0.1"
+dependencies = [
+ "eggmock",
+]
 
 [[package]]
 name = "num-bigint"

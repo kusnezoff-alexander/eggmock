@@ -64,7 +64,7 @@ pub fn rewrite_helper<N: Network>() -> String {
           roots.reserve( in_ntk.num_pos() );
           for ( uint32_t i = 0; i < in_ntk.num_pos(); i++ )
           {{
-            roots.emplace_back( in_ntk.po_at( i ).data );
+            roots.emplace_back( _impl::transfer_{ntk}_signal_id( in_ntk, in_ntk.po_at( i ), rewrite.data, rewrite.transfer ));
           }}
 
           {ntk_type} out_ntk;

@@ -96,8 +96,11 @@ pub fn transfer_helper<N: Network>() -> String {
         {{
             ntk.clear_values();
             ntk.clear_visited();
-            ntk.foreach_node( [&] ( auto node ) {{
+            ntk.foreach_node( [&] ( auto const& node ) {{
                 _impl::transfer_{ntk}_signal_id( ntk, ntk.make_signal( node ), transfer_data, transfer );
+            }} );
+            ntk.foreach_po( [&] ( auto const& signal ) {{
+                _impl::transfer_{ntk}_signal_id( ntk, signal, transfer_data, transfer );
             }} );
         }}
         "#,
@@ -120,7 +123,7 @@ pub fn receive_helper<N: Network>() -> String {
         inline uint64_t receive_{ntk}_create_symbol( void* data, uint64_t name )
         {{
           auto const ntk = static_cast<{ntk_type} *>( data );
-          while ( ntk->num_pis() < name )
+          while ( ntk->num_pis() <= name )
           {{
             ntk->create_pi();
           }}

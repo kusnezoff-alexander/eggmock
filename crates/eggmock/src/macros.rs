@@ -14,6 +14,7 @@ macro_rules! define_network {
                 }
             }
 
+            #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
             $vis enum $name {
                 Symbol(u64),
                 Const(bool),

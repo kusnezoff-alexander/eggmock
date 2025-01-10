@@ -14,6 +14,7 @@ pub trait Rewriter: Sized {
     ) -> RewriterResult<Self::Network>;
 }
 
+#[derive(Debug)]
 pub struct RewriterResult<N: Network> {
     pub expr: RecExpr<N::Language>,
     pub roots: Vec<Id>,
@@ -122,8 +123,8 @@ where
             map.insert(usize::from(id) as u64, node_id);
         }
 
-        for root in roots {
-            *root = map[root]
+        for (i, root) in roots.iter_mut().enumerate() {
+            *root = map[&(usize::from(result.roots[i]) as u64)]
         }
     }
 

@@ -1,5 +1,5 @@
 use crate::{AsNetworkTransfer, Network, NetworkTransfer, TransferFFI};
-use egg::{Analysis, EGraph, Id, RecExpr};
+use egg::{Analysis, CostFunction, EGraph, Extractor, Id, RecExpr};
 use std::collections::HashMap;
 
 pub trait Rewriter: Sized {
@@ -11,12 +11,32 @@ pub trait Rewriter: Sized {
         &mut self,
         egraph: EGraph<<Self::Network as Network>::Language, Self::Analysis>,
         roots: impl Iterator<Item = Id>,
-    ) -> RewriterResult<Self>;
+    ) -> RewriterResult<Self::Network>;
 }
 
-pub struct RewriterResult<R: Rewriter> {
-    pub expr: RecExpr<<R::Network as Network>::Language>,
+pub struct RewriterResult<N: Network> {
+    pub expr: RecExpr<N::Language>,
     pub roots: Vec<Id>,
+}
+
+impl<N: Network> RewriterResult<N> {
+    pub fn extract_greedy<A: Analysis<N::Language>, CF: CostFunction<N::Language>>(
+        graph: &EGraph<N::Language, A>,
+        cost: CF,
+        roots: impl IntoIterator<Item = Id>,
+    ) -> Self {
+        let extractor = Extractor::new(graph, cost);
+        let mut expr = Vec::new();
+        let mut expr_roots = vec![];
+        for root in roots {
+            expr.extend(extractor.find_best(root).1);
+            expr_roots.push(Id::from(expr.len() - 1));
+        }
+        Self {
+            expr: RecExpr::from(expr),
+            roots: expr_roots
+        }
+    }
 }
 
 struct RewriteData<R: Rewriter> {
@@ -34,6 +54,7 @@ pub struct RewriteFFI<N: Network> {
         roots_size: libc::size_t,
         callback: RewriteCallback<N>,
     ),
+    free: extern "C" fn(*mut libc::c_void),
 }
 
 #[repr(C)]
@@ -41,8 +62,6 @@ pub struct RewriteCallback<N: Network> {
     data: *mut libc::c_void,
     transfer: N::TransferFFI,
 }
-
-impl<N: Network> RewriteCallback<N> {}
 
 impl<R> AsNetworkTransfer<R::Network> for RewriteData<R>
 where
@@ -71,6 +90,7 @@ where
             data: Box::into_raw(Box::new(data)) as *mut libc::c_void,
             transfer: <R::Network as Network>::TransferFFI::new::<RewriteData<R>>(),
             rewrite: Self::rewrite::<R>,
+            free: Self::free::<R>,
         }
     }
 
@@ -81,7 +101,11 @@ where
         callback: RewriteCallback<N>,
     ) {
         let data = unsafe { &mut *(data as *mut RewriteData<R>) };
-        let roots = unsafe { std::slice::from_raw_parts_mut(roots, roots_size) };
+        let roots = if roots == std::ptr::null_mut() {
+            [].as_mut_slice()
+        } else {
+            unsafe { std::slice::from_raw_parts_mut(roots, roots_size) }
+        };
 
         let mut graph = EGraph::new(data.rewriter.create_analysis());
         std::mem::swap(&mut data.graph, &mut graph);
@@ -100,6 +124,12 @@ where
 
         for root in roots {
             *root = map[root]
+        }
+    }
+
+    extern "C" fn free<R: Rewriter>(data: *mut libc::c_void) {
+        unsafe {
+            let _ = Box::from_raw(data as *mut RewriteData<R>);
         }
     }
 }

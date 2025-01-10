@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "crates/*", "examples/mig_rewrite/eggmock-example-mig",
+    "crates/*",
 ]
 resolver = "2"
 

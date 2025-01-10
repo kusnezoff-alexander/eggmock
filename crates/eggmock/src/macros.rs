@@ -1,6 +1,6 @@
 #[macro_export]
 macro_rules! define_network {
-    ($(#[$meta:meta])* $vis:vis enum $name:ident {
+    ($(#[$meta:meta])* $vis:vis enum $mockturtle_ntk:literal = $name:ident {
         $($gate_str:literal = $gate:ident($fanin:literal, $mockturtle_create:ident, $mockturtle_is:ident)),+
     }) => {
         $crate::paste::paste! {
@@ -30,6 +30,7 @@ macro_rules! define_network {
                 const GATE_TYPES: &'static [Self::GateType] = &[
                     $([<$name GateType>]::$gate),+
                 ];
+                const MOCKTURTLE_TYPENAME: &'static str = concat!($mockturtle_ntk, "_network");
 
                 fn map_ids(&self, map: impl Fn(u64) -> u64) -> Self {
                     match self {

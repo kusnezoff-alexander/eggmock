@@ -119,7 +119,7 @@ where
             let node = N::from(node.clone());
             let node_id = callback
                 .transfer
-                .create(callback.data, node.map_ids(|id| map[&id]));
+                .create(callback.data, node.map_children(|id| map[&id]));
             map.insert(usize::from(id) as u64, node_id);
         }
 

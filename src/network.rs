@@ -9,7 +9,8 @@ pub trait Network: From<Self::Language> {
     const GATE_TYPES: &'static [Self::GateType];
     const MOCKTURTLE_TYPENAME: &'static str;
 
-    fn map_ids(&self, map: impl Fn(u64) -> u64) -> Self;
+    fn map_children(&self, map: impl Fn(u64) -> u64) -> Self;
+    fn children(&self) -> &[u64];
 }
 
 pub trait GateType: Sized + 'static {

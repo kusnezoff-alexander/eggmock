@@ -33,7 +33,7 @@ macro_rules! define_network {
                 ];
                 const MOCKTURTLE_TYPENAME: &'static str = concat!($mockturtle_ntk, "_network");
 
-                fn map_children(&self, map: impl Fn(u64) -> u64) -> Self {
+                fn map_inputs(&self, map: impl Fn(u64) -> u64) -> Self {
                     match self {
                         Self::Symbol(name) => Self::Symbol(*name),
                         Self::Const(bool) => Self::Const(*bool),
@@ -46,7 +46,7 @@ macro_rules! define_network {
                     }
                 }
 
-                fn children(&self) -> &[u64] {
+                fn inputs(&self) -> &[u64] {
                     match self {
                         Self::Symbol(_) => &[],
                         Self::Const(_) => &[],

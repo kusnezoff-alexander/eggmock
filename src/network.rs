@@ -14,8 +14,8 @@ pub trait Network: 'static + Sized {
     const GATE_TYPES: &'static [Self::GateType];
     const MOCKTURTLE_TYPENAME: &'static str;
 
-    fn map_children(&self, map: impl Fn(u64) -> u64) -> Self;
-    fn children(&self) -> &[u64];
+    fn map_inputs(&self, map: impl Fn(u64) -> u64) -> Self;
+    fn inputs(&self) -> &[u64];
 }
 
 pub trait GateType: 'static + Sized {

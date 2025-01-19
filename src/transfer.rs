@@ -1,6 +1,7 @@
 use super::{Network, NetworkLanguage};
 use egg::{Analysis, CostFunction, EGraph, Extractor, Id};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::marker::PhantomData;
 
 pub trait Receiver<N: Network>: Sized {
     type Result;
@@ -21,37 +22,68 @@ pub trait Receiver<N: Network>: Sized {
 pub trait Provider<N: Network> {
     fn outputs(&self) -> impl Iterator<Item = u64>;
     fn node(&self, id: u64) -> N;
+    fn iter(&self) -> impl Iterator<Item = (u64, N)> + '_ {
+        ProviderNodeIterator {
+            provider: self,
+            visited: FxHashSet::default(),
+            remaining: Vec::from_iter(self.outputs()),
+            _n: PhantomData,
+        }
+    }
     fn send<R: Receiver<N>>(&self, mut receiver: R) -> R::Result {
         let mut src_to_dest_id = FxHashMap::default();
         let mut path = Vec::new();
         for node_id in self.outputs() {
             let mut node_id = node_id;
             let mut node = self.node(node_id);
-            let mut known_children = 0;
+            let mut known_inputs = 0;
             loop {
-                if known_children == node.children().len() || src_to_dest_id.contains_key(&node_id)
+                if known_inputs == node.inputs().len() || src_to_dest_id.contains_key(&node_id)
                 {
-                    if known_children == node.children().len() {
-                        let dest_node = node.map_children(|child| src_to_dest_id[&child]);
+                    if known_inputs == node.inputs().len() {
+                        let dest_node = node.map_inputs(|child| src_to_dest_id[&child]);
                         let dest_node_id = receiver.create_node(dest_node);
                         src_to_dest_id.insert(node_id, dest_node_id);
                     }
                     if path.is_empty() {
                         break;
                     }
-                    (node_id, node, known_children) = path.pop().unwrap();
-                    known_children += 1;
+                    (node_id, node, known_inputs) = path.pop().unwrap();
+                    known_inputs += 1;
                 } else {
-                    let child_id = node.children()[known_children];
-                    path.push((node_id, node, known_children));
+                    let child_id = node.inputs()[known_inputs];
+                    path.push((node_id, node, known_inputs));
                     node_id = child_id;
                     node = self.node(node_id);
-                    known_children = 0;
+                    known_inputs = 0;
                 }
             }
         }
         let outputs = Vec::from_iter(self.outputs().map(|src_id| src_to_dest_id[&src_id]));
         receiver.done(outputs.as_slice())
+    }
+}
+
+struct ProviderNodeIterator<'a, N, P: ?Sized> {
+    provider: &'a P,
+    visited: FxHashSet<u64>,
+    remaining: Vec<u64>,
+    _n: PhantomData<fn() -> N>,
+}
+
+impl<'a, N: Network, P: Provider<N> + ?Sized> Iterator for ProviderNodeIterator<'a, N, P> {
+    type Item = (u64, N);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let node_id = self.remaining.pop()?;
+            if !self.visited.insert(node_id) {
+                continue;
+            }
+            let node = self.provider.node(node_id);
+            self.remaining.extend_from_slice(node.inputs());
+            break Some((node_id, node));
+        }
     }
 }
 

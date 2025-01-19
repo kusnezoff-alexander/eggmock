@@ -3,13 +3,13 @@ use crate::{Network, Receiver, ReceiverFFI};
 pub trait Rewriter {
     type Network: Network;
     type Intermediate;
-    type Receiver: Receiver<Network = Self::Network, Result = Self::Intermediate>;
+    type Receiver: Receiver<Self::Network, Result = Self::Intermediate>;
 
     fn create_receiver(&mut self) -> Self::Receiver;
     fn rewrite(
         self,
         input: Self::Intermediate,
-        output: impl Receiver<Network = Self::Network, Result = ()>,
+        output: impl Receiver<Self::Network, Result = ()>,
     );
 }
 

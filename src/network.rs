@@ -8,7 +8,7 @@ pub trait NetworkLanguage: Language + From<Self::Network> {
 pub trait Network: 'static + Sized {
     type GateType: GateType<Network = Self>;
     type Language: NetworkLanguage<Network = Self>;
-    type ReceiverFFI<R>: ReceiverFFI<Network = Self, Result = R>;
+    type ReceiverFFI<R>: ReceiverFFI<Self, Result = R>;
 
     const TYPENAME: &'static str;
     const GATE_TYPES: &'static [Self::GateType];

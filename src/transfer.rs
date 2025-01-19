@@ -2,13 +2,12 @@ use super::{Network, NetworkLanguage};
 use egg::{Analysis, CostFunction, EGraph, Extractor, Id};
 use rustc_hash::FxHashMap;
 
-pub trait Receiver: Sized {
-    type Network: Network;
+pub trait Receiver<N: Network>: Sized {
     type Result;
 
-    fn create_node(&mut self, node: Self::Network) -> u64;
+    fn create_node(&mut self, node: N) -> u64;
     fn done(self, outputs: &[u64]) -> Self::Result;
-    fn map<Res2, F>(self, map: F) -> impl Receiver<Network = Self::Network, Result = Res2>
+    fn map<Res2, F>(self, map: F) -> impl Receiver<N, Result = Res2>
     where
         F: FnOnce(Self::Result) -> Res2,
     {
@@ -19,12 +18,10 @@ pub trait Receiver: Sized {
     }
 }
 
-pub trait Provider {
-    type Network: Network;
-
+pub trait Provider<N: Network> {
     fn outputs(&self) -> impl Iterator<Item = u64>;
-    fn node(&self, id: u64) -> Self::Network;
-    fn send<R: Receiver<Network = Self::Network>>(&self, mut receiver: R) -> R::Result {
+    fn node(&self, id: u64) -> N;
+    fn send<R: Receiver<N>>(&self, mut receiver: R) -> R::Result {
         let mut src_to_dest_id = FxHashMap::default();
         let mut path = Vec::new();
         for node_id in self.outputs() {
@@ -58,17 +55,16 @@ pub trait Provider {
     }
 }
 
-pub trait ReceiverFFI: Receiver {
+pub trait ReceiverFFI<N: Network>: Receiver<N> {
     fn new<R>(receiver: R) -> Self
     where
-        R: Receiver<Network = Self::Network, Result = Self::Result> + 'static;
+        R: Receiver<N, Result = Self::Result> + 'static;
 }
 
-impl<L: NetworkLanguage, A: Analysis<L>> Receiver for EGraph<L, A> {
-    type Network = L::Network;
+impl<L: NetworkLanguage, A: Analysis<L>> Receiver<L::Network> for EGraph<L, A> {
     type Result = (Self, Vec<Id>);
 
-    fn create_node(&mut self, node: Self::Network) -> u64 {
+    fn create_node(&mut self, node: L::Network) -> u64 {
         usize::from(self.add(L::from(node))) as u64
     }
 
@@ -88,14 +84,14 @@ struct MappedReceiver<Original, Function> {
     map: Function,
 }
 
-impl<O, R, F> Receiver for MappedReceiver<O, F>
+impl<N, O, R, F> Receiver<N> for MappedReceiver<O, F>
 where
-    O: Receiver,
+    N: Network,
+    O: Receiver<N>,
     F: FnOnce(O::Result) -> R,
 {
-    type Network = O::Network;
     type Result = R;
-    fn create_node(&mut self, node: Self::Network) -> u64 {
+    fn create_node(&mut self, node: N) -> u64 {
         self.original.create_node(node)
     }
     fn done(self, outputs: &[u64]) -> Self::Result {
@@ -103,16 +99,14 @@ where
     }
 }
 
-impl<'a, L: NetworkLanguage, CF: CostFunction<L>, A: Analysis<L>> Provider
+impl<'a, L: NetworkLanguage, CF: CostFunction<L>, A: Analysis<L>> Provider<L::Network>
     for (Extractor<'a, CF, L, A>, Vec<Id>)
 {
-    type Network = L::Network;
-
     fn outputs(&self) -> impl Iterator<Item = u64> {
         self.1.iter().map(|o| usize::from(*o) as u64)
     }
 
-    fn node(&self, id: u64) -> Self::Network {
-        Self::Network::from(self.0.find_best_node(Id::from(id as usize)).clone())
+    fn node(&self, id: u64) -> L::Network {
+        L::Network::from(self.0.find_best_node(Id::from(id as usize)).clone())
     }
 }

@@ -135,10 +135,10 @@ macro_rules! define_network {
                 done: extern "C" fn (*mut $crate::libc::c_void, outputs: *const u64, outputs_size: usize) -> R,
             }
 
-            impl<R> $crate::ReceiverFFI for [<$name ReceiverFFI>]<R> {
+            impl<R> $crate::ReceiverFFI<$name> for [<$name ReceiverFFI>]<R> {
                 fn new<Recv>(receiver: Recv) -> Self
                 where
-                    Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                    Recv: $crate::Receiver<$name, Result = R> + 'static
                 {
                     let data = Box::into_raw(Box::new(receiver));
                     Self {
@@ -152,8 +152,7 @@ macro_rules! define_network {
                 }
             }
 
-            impl<R> $crate::Receiver for [<$name ReceiverFFI>]<R> {
-                type Network = $name;
+            impl<R> $crate::Receiver<$name> for [<$name ReceiverFFI>]<R> {
                 type Result = R;
 
                 fn create_node(&mut self, node: $name) -> u64 {
@@ -180,7 +179,7 @@ macro_rules! define_network {
                     name: u64
                 ) -> u64
                 where
-                    Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                    Recv: $crate::Receiver<$name, Result = R> + 'static
                 {
                     unsafe { &mut *(data as *mut Recv) }.create_node($name::Symbol(name))
                 }
@@ -190,7 +189,7 @@ macro_rules! define_network {
                     value: bool
                 ) -> u64
                 where
-                    Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                    Recv: $crate::Receiver<$name, Result = R> + 'static
                 {
                     unsafe { &mut *(data as *mut Recv) }.create_node($name::Const(value))
                 }
@@ -200,7 +199,7 @@ macro_rules! define_network {
                     id: u64
                 ) -> u64
                 where
-                    Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                    Recv: $crate::Receiver<$name, Result = R> + 'static
                 {
                     unsafe { &mut *(data as *mut Recv) }.create_node($name::Not(id))
                 }
@@ -211,19 +210,19 @@ macro_rules! define_network {
                         #(, id~N: u64)*
                     ) -> u64
                     where
-                        Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                        Recv: $crate::Receiver<$name, Result = R> + 'static
                     {
                         unsafe { &mut *(data as *mut Recv) }.create_node($name::$gate([#(id~N,)*]))
                     }
                 });)+
 
-                extern "C" fn done<Recv: $crate::Receiver<Network = $name, Result = R>>(
+                extern "C" fn done<Recv: $crate::Receiver<$name, Result = R>>(
                     data: *mut $crate::libc::c_void,
                     outputs: *const u64,
                     outputs_size: usize,
                 ) -> R
                 where
-                    Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                    Recv: $crate::Receiver<$name, Result = R> + 'static
                 {
                     let outputs = if outputs_size == 0 {
                         &[]

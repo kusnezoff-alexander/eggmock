@@ -63,7 +63,7 @@ impl Rewriter for ExampleRewriter {
     fn rewrite(
         self,
         (graph, roots): Self::Intermediate,
-        output: impl Receiver<Network = Self::Network, Result = ()>,
+        output: impl Receiver<Self::Network, Result = ()>,
     ) {
         let rules = &[
             rewrite!("commute_1"; "(maj ?a ?b ?c)" => "(maj ?b ?a ?c)"),

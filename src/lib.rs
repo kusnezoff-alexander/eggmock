@@ -2,6 +2,7 @@ mod gen;
 mod macros;
 mod network;
 mod rewrite;
+mod transfer;
 
 pub use egg;
 pub use libc;
@@ -10,8 +11,9 @@ pub use seq_macro;
 
 pub use network::*;
 pub use rewrite::*;
+pub use transfer::*;
 
-pub use gen::ffi_header;
+pub use gen::*;
 
 define_network! {
     pub enum "mig" = Mig {

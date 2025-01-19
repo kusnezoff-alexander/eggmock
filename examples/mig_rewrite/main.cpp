@@ -6,7 +6,7 @@ using namespace eggmock;
 
 extern "C"
 {
-  extern mig_rewrite example_mig_rewrite();
+  extern mig_receiver<mig_rewrite> example_mig_rewrite();
 }
 
 int main()

@@ -1,14 +1,14 @@
 # eggmock
 
-eggmock provides facilities to
+*eggmock* provides facilities to
 - transfer and receive logic networks from [**mock**turtle](https://github.com/lsils/mockturtle) to and from Rust code with an automatically generated FFI and
 - rewrite them using the [**egg**](https://github.com/egraphs-good/egg) library.
 
-Currently, eggmock supports AIGs, MIGs, XMGs and XAGs.
+Currently, *eggmock* supports AIGs, MIGs, XMGs and XAGs.
 
 ## Prerequisites
 
-To use eggmock, you need
+To use *eggmock*, you need
 - a modern C++ compiler and CMake 
 - a working Rust installation
 
@@ -28,4 +28,5 @@ This will create two files:
 
 ## Notes
 
-Make sure to run a release build when measuring performance.
+- make sure to run a release build when measuring performance
+- *eggmock* currently does not guarantee to be memory leak free in program runs that involve panics or exceptions

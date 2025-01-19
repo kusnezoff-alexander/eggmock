@@ -1,9 +1,14 @@
 use egg::Language;
+use super::ReceiverFFI;
 
-pub trait Network: From<Self::Language> {
+pub trait NetworkLanguage: Language + From<Self::Network> {
+    type Network: Network<Language = Self> + From<Self>;
+}
+
+pub trait Network: 'static + Sized {
     type GateType: GateType<Network = Self>;
-    type Language: Language + From<Self>;
-    type TransferFFI: TransferFFI<Network = Self>;
+    type Language: NetworkLanguage<Network = Self>;
+    type ReceiverFFI<R>: ReceiverFFI<Network = Self, Result = R>;
 
     const TYPENAME: &'static str;
     const GATE_TYPES: &'static [Self::GateType];
@@ -13,7 +18,7 @@ pub trait Network: From<Self::Language> {
     fn children(&self) -> &[u64];
 }
 
-pub trait GateType: Sized + 'static {
+pub trait GateType: 'static + Sized {
     type Network: Network<GateType = Self>;
 
     fn name(&self) -> &'static str;
@@ -21,19 +26,4 @@ pub trait GateType: Sized + 'static {
 
     fn mockturtle_create(&self) -> &'static str;
     fn mockturtle_is(&self) -> &'static str;
-}
-
-pub trait NetworkTransfer<N: Network> {
-    fn create(&mut self, node: N) -> u64;
-}
-
-pub trait TransferFFI {
-    type Network: Network;
-
-    fn new<T: AsNetworkTransfer<Self::Network>>() -> Self;
-    fn create(&self, data: *mut libc::c_void, node: Self::Network) -> u64;
-}
-
-pub trait AsNetworkTransfer<N: Network> {
-    fn as_transfer(&mut self) -> &mut impl NetworkTransfer<N>;
 }

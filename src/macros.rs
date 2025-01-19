@@ -25,7 +25,7 @@ macro_rules! define_network {
             impl $crate::Network for $name {
                 type GateType = $crate::paste::paste!([<$name GateType>]);
                 type Language = [<$name Language>];
-                type TransferFFI = [<$name TransferFFI>];
+                type ReceiverFFI<R> = [<$name ReceiverFFI>]<R>;
 
                 const TYPENAME: &'static str = stringify!([<$name:snake:lower>]);
                 const GATE_TYPES: &'static [Self::GateType] = &[
@@ -54,6 +54,10 @@ macro_rules! define_network {
                         $(Self::$gate(ids) => ids),+
                     }
                 }
+            }
+
+            impl NetworkLanguage for [<$name Language>] {
+                type Network = $name;
             }
 
             #[derive(Copy, Clone, Eq, PartialEq, Hash)]
@@ -119,83 +123,115 @@ macro_rules! define_network {
                 }
             }
 
-            impl<A> $crate::NetworkTransfer<$name> for $crate::egg::EGraph<[<$name Language>], A>
-            where
-                A: $crate::egg::Analysis<[<$name Language>]>
-            {
-                fn create(&mut self, node: $name) -> u64 {
-                    usize::from(self.add([<$name Language>]::from(node))) as u64
-                }
-            }
-
             #[repr(C)]
-            $vis struct [<$name TransferFFI>] {
-                pub create_symbol: extern "C" fn(*mut $crate::libc::c_void, name: u64) -> u64,
-                pub create_constant: extern "C" fn (*mut $crate::libc::c_void, value: bool) -> u64,
-                pub create_not: extern "C" fn (*mut $crate::libc::c_void, id: u64) -> u64,
-                $(pub [<create_ $gate:snake:lower>]: $crate::seq_macro::seq!(N in 1..=$fanin {
+            $vis struct [<$name ReceiverFFI>]<R> {
+                data: *mut $crate::libc::c_void,
+                create_symbol: extern "C" fn(*mut $crate::libc::c_void, name: u64) -> u64,
+                create_constant: extern "C" fn (*mut $crate::libc::c_void, value: bool) -> u64,
+                create_not: extern "C" fn (*mut $crate::libc::c_void, id: u64) -> u64,
+                $([<create_ $gate:snake:lower>]: $crate::seq_macro::seq!(N in 1..=$fanin {
                      extern "C" fn(*mut $crate::libc::c_void, #(id~N: u64,)*) -> u64
                 })),+,
+                done: extern "C" fn (*mut $crate::libc::c_void, outputs: *const u64, outputs_size: usize) -> R,
             }
 
-            impl TransferFFI for [<$name TransferFFI>] {
-                type Network = $name;
-
-                fn new<T: $crate::AsNetworkTransfer<Self::Network> + Sized>() -> Self {
+            impl<R> $crate::ReceiverFFI for [<$name ReceiverFFI>]<R> {
+                fn new<Recv>(receiver: Recv) -> Self
+                where
+                    Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                {
+                    let data = Box::into_raw(Box::new(receiver));
                     Self {
-                        create_symbol: Self::create_symbol::<T>,
-                        create_constant: Self::create_constant::<T>,
-                        create_not: Self::create_not::<T>,
-                        $([<create_ $gate:snake:lower>]: Self::[<create_ $gate:snake:lower>]::<T>),+,
+                        data: data as *mut $crate::libc::c_void,
+                        create_symbol: Self::create_symbol::<Recv>,
+                        create_constant: Self::create_constant::<Recv>,
+                        create_not: Self::create_not::<Recv>,
+                        $([<create_ $gate:snake:lower>]: Self::[<create_ $gate:snake:lower>]::<Recv>),+,
+                        done: Self::done::<Recv>,
                     }
                 }
+            }
 
-                fn create(&self, data: *mut libc::c_void, node: $name) -> u64 {
+            impl<R> $crate::Receiver for [<$name ReceiverFFI>]<R> {
+                type Network = $name;
+                type Result = R;
+
+                fn create_node(&mut self, node: $name) -> u64 {
                     match node {
-                        $name::Symbol(name) => (self.create_symbol)(data, name),
-                        $name::Const(value) => (self.create_constant)(data, value),
-                        $name::Not(id) => (self.create_not)(data, id),
+                        $name::Symbol(name) => (self.create_symbol)(self.data, name),
+                        $name::Const(value) => (self.create_constant)(self.data, value),
+                        $name::Not(id) => (self.create_not)(self.data, id),
                         $($name::$gate(ids) => {
                             $crate::seq_macro::seq!(N in 0..$fanin {
-                                (self.[<create_ $gate:snake:lower>])(data, #(ids[N],)*)
+                                (self.[<create_ $gate:snake:lower>])(self.data, #(ids[N],)*)
                             })
                         }),+
                     }
                 }
+
+                fn done(self, outputs: &[u64]) -> R {
+                    (self.done)(self.data, outputs.as_ptr(), outputs.len())
+                }
             }
 
-            impl [<$name TransferFFI>] {
-                extern "C" fn create_symbol<T: $crate::AsNetworkTransfer<$name> + Sized>(
+            impl<R> [<$name ReceiverFFI>]<R> {
+                extern "C" fn create_symbol<Recv>(
                     data: *mut $crate::libc::c_void,
                     name: u64
-                ) -> u64 {
-                    unsafe { &mut *(data as *mut T) }.as_transfer().create($name::Symbol(name))
+                ) -> u64
+                where
+                    Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                {
+                    unsafe { &mut *(data as *mut Recv) }.create_node($name::Symbol(name))
                 }
 
-                extern "C" fn create_constant<T: $crate::AsNetworkTransfer<$name> + Sized>(
+                extern "C" fn create_constant<Recv>(
                     data: *mut $crate::libc::c_void,
                     value: bool
-                ) -> u64 {
-                    unsafe { &mut *(data as *mut T) }.as_transfer().create($name::Const(value))
+                ) -> u64
+                where
+                    Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                {
+                    unsafe { &mut *(data as *mut Recv) }.create_node($name::Const(value))
                 }
 
-                extern "C" fn create_not<T: $crate::AsNetworkTransfer<$name> + Sized>(
+                extern "C" fn create_not<Recv>(
                     data: *mut $crate::libc::c_void,
                     id: u64
-                ) -> u64 {
-                    unsafe { &mut *(data as *mut T) }.as_transfer().create($name::Not(id))
+                ) -> u64
+                where
+                    Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                {
+                    unsafe { &mut *(data as *mut Recv) }.create_node($name::Not(id))
                 }
 
                 $($crate::seq_macro::seq!(N in 1..=$fanin {
-                    pub extern "C" fn [<create_ $gate:snake:lower>]<T: $crate::AsNetworkTransfer<$name> + Sized>(
+                    pub extern "C" fn [<create_ $gate:snake:lower>]<Recv>(
                         data: *mut $crate::libc::c_void
                         #(, id~N: u64)*
-                    ) -> u64 {
-                        unsafe { &mut *(data as *mut T) }
-                            .as_transfer()
-                            .create($name::$gate([#(id~N,)*]))
+                    ) -> u64
+                    where
+                        Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                    {
+                        unsafe { &mut *(data as *mut Recv) }.create_node($name::$gate([#(id~N,)*]))
                     }
                 });)+
+
+                extern "C" fn done<Recv: $crate::Receiver<Network = $name, Result = R>>(
+                    data: *mut $crate::libc::c_void,
+                    outputs: *const u64,
+                    outputs_size: usize,
+                ) -> R
+                where
+                    Recv: $crate::Receiver<Network = $name, Result = R> + 'static
+                {
+                    let outputs = if outputs_size == 0 {
+                        &[]
+                    } else {
+                        unsafe { std::slice::from_raw_parts(outputs, outputs_size) }
+                    };
+                    unsafe { Box::from_raw(data as *mut Recv) }.done(outputs)
+                }
             }
         }
     };

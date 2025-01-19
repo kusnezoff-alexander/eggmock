@@ -1,11 +1,13 @@
+use eggmock::{
+    egg::{rewrite, CostFunction, EGraph, Extractor, Id, Language, Runner},
+    Mig, MigLanguage, MigReceiverFFI, Provider, Receiver, Rewriter, RewriterFFI,
+};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::rc::Rc;
-use eggmock::egg::{rewrite, CostFunction, EGraph, Id, Language, Runner};
-use eggmock::{Mig, MigLanguage, Network, RewriteFFI, Rewriter, RewriterResult};
 use std::time::Duration;
 
-/// Optimizes for number of constant-users
+/// Optimizes for number of constant-uses
 struct ExampleCostFunction;
 
 #[derive(Debug, Clone)]
@@ -51,17 +53,18 @@ struct ExampleRewriter;
 
 impl Rewriter for ExampleRewriter {
     type Network = Mig;
-    type Analysis = ();
+    type Intermediate = (EGraph<MigLanguage, ()>, Vec<Id>);
+    type Receiver = EGraph<MigLanguage, ()>;
 
-    fn create_analysis(&mut self) -> Self::Analysis {
-        ()
+    fn create_receiver(&mut self) -> Self::Receiver {
+        EGraph::new(())
     }
 
     fn rewrite(
-        &mut self,
-        graph: EGraph<<Self::Network as Network>::Language, Self::Analysis>,
-        roots: impl Iterator<Item = Id>,
-    ) -> RewriterResult<Mig> {
+        self,
+        (graph, roots): Self::Intermediate,
+        output: impl Receiver<Network = Self::Network, Result = ()>,
+    ) {
         let rules = &[
             rewrite!("commute_1"; "(maj ?a ?b ?c)" => "(maj ?b ?a ?c)"),
             rewrite!("commute_2"; "(maj ?a ?b ?c)" => "(maj ?a ?c ?b)"),
@@ -74,11 +77,11 @@ impl Rewriter for ExampleRewriter {
             .with_egraph(graph)
             .run(rules);
         runner.print_report();
-        RewriterResult::extract_greedy(&runner.egraph, ExampleCostFunction, roots)
+        (Extractor::new(&runner.egraph, ExampleCostFunction), roots).send(output)
     }
 }
 
 #[no_mangle]
-extern "C" fn example_mig_rewrite() -> RewriteFFI<Mig> {
-    RewriteFFI::new(ExampleRewriter)
+extern "C" fn example_mig_rewrite() -> MigReceiverFFI<RewriterFFI<Mig>> {
+    RewriterFFI::new(ExampleRewriter)
 }

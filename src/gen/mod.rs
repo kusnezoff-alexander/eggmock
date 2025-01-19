@@ -1,26 +1,19 @@
 mod rewrite;
 mod transfer;
 
-use crate::{Aig, Mig, Network, RewriteCallback, RewriteFFI, TransferFFI, Xag, Xmg};
+use crate::{Aig, Mig, Network, Xag, Xmg};
 use indoc::formatdoc;
 
-trait StructFFI {
-    fn struct_name() -> String;
-    fn struct_definition() -> String;
-}
-
 pub fn network_ffi<N: Network>() -> String {
-    formatdoc!(
-        "{}{}{}{}{}{}",
-        <N::TransferFFI as StructFFI>::struct_definition(),
-        RewriteCallback::<N>::struct_definition(),
-        RewriteFFI::<N>::struct_definition(),
-        transfer::transfer_helper::<N>(),
+    format!(
+        "{}{}{}{}{}",
+        transfer::receiver_struct::<N>(),
+        transfer::send_helper::<N>(),
         transfer::receive_helper::<N>(),
+        rewrite::rewrite_struct::<N>(),
         rewrite::rewrite_helper::<N>()
     )
 }
-
 
 pub fn ffi_header() -> String {
     formatdoc!(
@@ -36,7 +29,6 @@ pub fn ffi_header() -> String {
 
         namespace eggmock
         {{
-
         {}
         {}
         {}

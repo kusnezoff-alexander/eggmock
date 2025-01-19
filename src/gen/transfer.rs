@@ -1,36 +1,33 @@
 use super::*;
 use crate::GateType;
 
-impl<T: TransferFFI> StructFFI for T {
-    fn struct_name() -> String {
-        format!("{}_transfer", T::Network::TYPENAME)
-    }
-    fn struct_definition() -> String {
-        let mut additional_fields = "".to_string();
-        for gate in T::Network::GATE_TYPES {
-            additional_fields += format!(
-                "  uint64_t ( *create_{} )( void* data, {} );\n",
-                gate.name(),
-                id_parameters(gate)
-            )
-            .as_str();
-        }
-        formatdoc!(
-            r#"
-            struct {}
-            {{
-              uint64_t ( *create_symbol )( void* data, uint64_t name );
-              uint64_t ( *create_const )( void* data, bool value );
-              uint64_t ( *create_not )( void* data, uint64_t id );
-            {additional_fields}}};
-            "#,
-            Self::struct_name()
+pub fn receiver_struct<N: Network>() -> String {
+    let ntk = N::TYPENAME;
+    let mut additional_fields = "".to_string();
+    for gate in N::GATE_TYPES {
+        additional_fields += format!(
+            "\n  uint64_t ( *create_{} )( void* data, {} );",
+            gate.name(),
+            id_parameters(gate)
         )
+        .as_str();
     }
+    formatdoc!(
+        r#"
+        template<class result>
+        struct {ntk}_receiver
+        {{
+          void* data;
+          uint64_t ( *create_symbol )( void* data, uint64_t name );
+          uint64_t ( *create_const )( void* data, bool value );
+          uint64_t ( *create_not )( void* data, uint64_t id );{additional_fields}
+          result ( *done )( void* data, uint64_t const* roots, size_t roots_size );
+        }};
+        "#
+    )
 }
 
-pub fn transfer_helper<N: Network>() -> String {
-    let transfer_struct = <N::TransferFFI as StructFFI>::struct_name();
+pub fn send_helper<N: Network>() -> String {
     let ntk = N::TYPENAME;
     let ntk_type = format!("mockturtle::{}", N::MOCKTURTLE_TYPENAME);
     let mut gate_cases = "".to_string();
@@ -50,9 +47,9 @@ pub fn transfer_helper<N: Network>() -> String {
   {{
     uint64_t fanins[{fanin}];
     ntk.foreach_fanin( node, [&]( {ntk_type}::signal const& fanin, uint32_t const index ) {{
-      fanins[index] = transfer_{ntk}_signal_id( ntk, fanin, transfer_data, transfer );
-    }});
-    id = transfer.create_{gate_name}( transfer_data{fanins} );
+      fanins[index] = send_{ntk}_signal_id( ntk, fanin, receiver );
+    }} );
+    id = receiver.create_{gate_name}( receiver.data{fanins} );
   }}",
         )
         .as_str();
@@ -61,7 +58,9 @@ pub fn transfer_helper<N: Network>() -> String {
         r#"
         namespace _impl
         {{
-        inline uint64_t transfer_{ntk}_signal_id ( {ntk_type} const& ntk, {ntk_type}::signal const& signal, void* transfer_data, {transfer_struct} const& transfer ) {{
+        template<class result>
+        uint64_t send_{ntk}_signal_id( {ntk_type} const& ntk, {ntk_type}::signal const& signal, {ntk}_receiver<result> const& receiver )
+        {{
           auto const node = ntk.get_node( signal );
 
           uint64_t id;
@@ -71,11 +70,11 @@ pub fn transfer_helper<N: Network>() -> String {
           }}
           else if ( ntk.is_pi( node ) )
           {{
-            id = transfer.create_symbol( transfer_data, ntk.pi_index( node ) );
+            id = receiver.create_symbol( receiver.data, ntk.pi_index( node ) );
           }}
-          else if ( ntk.is_constant ( node ) )
+          else if ( ntk.is_constant( node ) )
           {{
-            id = transfer.create_const( transfer_data, ntk.constant_value( node ) );
+            id = receiver.create_const( receiver.data, ntk.constant_value( node ) );
           }}{gate_cases}
           else
           {{
@@ -84,45 +83,45 @@ pub fn transfer_helper<N: Network>() -> String {
 
           if ( ntk.is_complemented( signal ) )
           {{
-            id = transfer.create_not( transfer_data, id );
+            id = receiver.create_not( receiver.data, id );
           }}
 
           ntk.set_value( node, id );
           ntk.set_visited( node, true );
           return id;
         }}
-        }}
-        inline void transfer_{ntk} ( {ntk_type} const& ntk, void* transfer_data, {transfer_struct} const& transfer )
+        }} // namespace _impl
+        template<class result>
+        result send_{ntk} ( {ntk_type} const& ntk, {ntk}_receiver<result> const& receiver )
         {{
-            ntk.clear_values();
-            ntk.clear_visited();
-            ntk.foreach_node( [&] ( auto const& node ) {{
-                _impl::transfer_{ntk}_signal_id( ntk, ntk.make_signal( node ), transfer_data, transfer );
-            }} );
-            ntk.foreach_po( [&] ( auto const& signal ) {{
-                _impl::transfer_{ntk}_signal_id( ntk, signal, transfer_data, transfer );
-            }} );
+          ntk.clear_values();
+          ntk.clear_visited();
+          ntk.foreach_node( [&] ( auto const& node ) {{
+            _impl::send_{ntk}_signal_id( ntk, ntk.make_signal( node ), receiver );
+          }} );
+
+          std::vector<uint64_t> roots;
+          roots.reserve( ntk.num_pos() );
+          ntk.foreach_po( [&] ( auto const& signal ) {{
+            uint64_t id = _impl::send_{ntk}_signal_id( ntk, signal, receiver );
+            roots.emplace_back( id );
+          }} );
+          return receiver.done( receiver.data, roots.data(), roots.size() );
         }}
         "#,
     )
 }
 
 pub fn receive_helper<N: Network>() -> String {
-    let transfer_struct = <N::TransferFFI as StructFFI>::struct_name();
     let ntk = N::TYPENAME;
     let ntk_type = format!("mockturtle::{}", N::MOCKTURTLE_TYPENAME);
 
-    let mut struct_initializers = format!(
-        r#"      .create_symbol = _impl::receive_{ntk}_create_symbol,
-      .create_const = _impl::receive_{ntk}_create_const,
-      .create_not = _impl::receive_{ntk}_create_not,
-"#
-    );
+    let mut struct_initializers = String::new();
     let mut impl_methods = formatdoc!(
         r#"
         inline uint64_t receive_{ntk}_create_symbol( void* data, uint64_t name )
         {{
-          auto const ntk = static_cast<{ntk_type} *>( data );
+          auto const ntk = static_cast<{ntk_type}*>( data );
           while ( ntk->num_pis() <= name )
           {{
             ntk->create_pi();
@@ -132,14 +131,23 @@ pub fn receive_helper<N: Network>() -> String {
 
         inline uint64_t receive_{ntk}_create_const( void* data, bool value )
         {{
-          auto const ntk = static_cast<{ntk_type} *>( data );
+          auto const ntk = static_cast<{ntk_type}*>( data );
           return ntk->get_constant( value ).data;
         }}
 
         inline uint64_t receive_{ntk}_create_not( void* data, uint64_t id )
         {{
-          auto const ntk = static_cast<{ntk_type} *>( data );
+          auto const ntk = static_cast<{ntk_type}*>( data );
           return ntk->create_not( {ntk_type}::signal( id ) ).data;
+        }}
+
+        inline void receive_{ntk}_done( void* data, uint64_t const* roots, size_t roots_size )
+        {{
+          auto const ntk = static_cast<{ntk_type}*>( data );
+          for ( size_t i = 0; i < roots_size; i++ )
+          {{
+            ntk->create_po( {ntk_type}::signal( roots[i] ) );
+          }}
         }}
         "#
     );
@@ -149,13 +157,13 @@ pub fn receive_helper<N: Network>() -> String {
             .map(|id| format!("{ntk_type}::signal( id{id} )"))
             .fold("".to_string(), |acc, x| acc + ", " + x.as_str());
         struct_initializers +=
-            format!("      .create_{gate_name} = _impl::receive_{ntk}_create_{gate_name},\n")
+            format!("\n      .create_{gate_name} = _impl::receive_{ntk}_create_{gate_name},")
                 .as_str();
         impl_methods += formatdoc!(
             r#"
             inline uint64_t receive_{ntk}_create_{gate_name}( void* data, {ids} )
             {{
-              auto const ntk = static_cast<{ntk_type} *>( data );
+              auto const ntk = static_cast<{ntk_type}*>( data );
               return ntk->{create}( {id_signals} ).data;
             }}
             "#,
@@ -171,11 +179,15 @@ pub fn receive_helper<N: Network>() -> String {
         namespace _impl
         {{
         {impl_methods}
-        }}
-        inline {transfer_struct} receive_{ntk}()
+        }} // namespace _impl
+        inline {ntk}_receiver<void> receive_{ntk}({ntk_type}& ntk)
         {{
           return {{
-        {struct_initializers}
+              .data = &ntk,
+              .create_symbol = _impl::receive_{ntk}_create_symbol,
+              .create_const = _impl::receive_{ntk}_create_const,
+              .create_not = _impl::receive_{ntk}_create_not,{struct_initializers}
+              .done = _impl::receive_{ntk}_done,
           }};
         }}
         "#

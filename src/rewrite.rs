@@ -1,5 +1,12 @@
 use crate::{Network, Receiver, ReceiverFFI};
 
+/// Allows rewriting of logic networks.
+///
+/// The rewriting process works as follows:
+/// 1. create a [`Receiver`]
+/// 2. send the network to the receiver
+/// 3. perform the rewrite on the result of the [`Receiver`]
+/// 4. send the result of the rewrite to an output [`Receiver`]
 pub trait Rewriter {
     type Network: Network;
     type Intermediate;
@@ -13,6 +20,10 @@ pub trait Rewriter {
     );
 }
 
+/// A struct that contains a data pointer and a function pointing to the function that performs the
+/// rewrite using the data.
+///
+/// Allocated memory is released after a call to the rewrite function.
 #[repr(C)]
 pub struct RewriterFFI<N: Network> {
     data: *mut libc::c_void,

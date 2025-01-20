@@ -1,3 +1,15 @@
+/// # Example
+/// ```no_run
+/// eggmock::define_network! {
+///     pub enum "xag" = Xag {
+///         // 2: fanin
+///         // create_and: name of create method in mockturtle
+///         // is_and: name of is method in mockturtle
+///         "*" = And(2, create_and, is_and),
+///         "xor" = Xor(2, create_xor, is_xor)
+///     }
+/// }
+/// ```
 #[macro_export]
 macro_rules! define_network {
     ($(#[$meta:meta])* $vis:vis enum $mockturtle_ntk:literal = $name:ident {
@@ -28,9 +40,6 @@ macro_rules! define_network {
                 type ReceiverFFI<R> = [<$name ReceiverFFI>]<R>;
 
                 const TYPENAME: &'static str = stringify!([<$name:snake:lower>]);
-                const GATE_TYPES: &'static [Self::GateType] = &[
-                    $([<$name GateType>]::$gate),+
-                ];
                 const MOCKTURTLE_TYPENAME: &'static str = concat!($mockturtle_ntk, "_network");
 
                 fn map_inputs(&self, map: impl Fn(u64) -> u64) -> Self {
@@ -67,6 +76,9 @@ macro_rules! define_network {
 
             impl $crate::GateType for [<$name GateType>] {
                 type Network = $name;
+                const VARIANTS: &'static [Self] = &[
+                    $(Self::$gate),+
+                ];
 
                 fn name(&self) -> &'static str {
                     match self {

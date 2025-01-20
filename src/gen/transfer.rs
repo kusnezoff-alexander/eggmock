@@ -4,7 +4,7 @@ use crate::GateType;
 pub fn receiver_struct<N: Network>() -> String {
     let ntk = N::TYPENAME;
     let mut additional_fields = "".to_string();
-    for gate in N::GATE_TYPES {
+    for gate in N::GateType::VARIANTS {
         additional_fields += format!(
             "\n  uint64_t ( *create_{} )( void* data, {} );",
             gate.name(),
@@ -31,7 +31,7 @@ pub fn send_helper<N: Network>() -> String {
     let ntk = N::TYPENAME;
     let ntk_type = format!("mockturtle::{}", N::MOCKTURTLE_TYPENAME);
     let mut gate_cases = "".to_string();
-    for gate in N::GATE_TYPES {
+    for gate in N::GateType::VARIANTS {
         let fanin = gate.fanin();
         let gate_name = gate.name();
         let mockturtle_is = gate.mockturtle_is();
@@ -151,7 +151,7 @@ pub fn receive_helper<N: Network>() -> String {
         }}
         "#
     );
-    for gate in N::GATE_TYPES {
+    for gate in N::GateType::VARIANTS {
         let gate_name = gate.name();
         let id_signals = (1..=gate.fanin())
             .map(|id| format!("{ntk_type}::signal( id{id} )"))

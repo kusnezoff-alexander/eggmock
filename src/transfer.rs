@@ -3,11 +3,19 @@ use egg::{Analysis, CostFunction, EGraph, Extractor, Id};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::marker::PhantomData;
 
+/// A type that can receive a logic network and produce some result from it.
+///
+/// This trait is implemented for [`EGraph`s](EGraph) with [`NetworkLanguage`s](NetworkLanguage), so
+/// that EGraphs can be easily received from C++ code.
 pub trait Receiver<N: Network>: Sized {
     type Result;
 
+    /// Creates the given node. Returns the id of the newly created node.
     fn create_node(&mut self, node: N) -> u64;
+    /// Creates the result from the previously transferred nodes where `outputs` contains the ids of
+    /// the nodes that generate the output signals of the network.
     fn done(self, outputs: &[u64]) -> Self::Result;
+    /// Maps the result of this Receiver using the given function.
     fn map<Res2, F>(self, map: F) -> impl Receiver<N, Result = Res2>
     where
         F: FnOnce(Self::Result) -> Res2,
@@ -19,9 +27,18 @@ pub trait Receiver<N: Network>: Sized {
     }
 }
 
+/// A type that contains a logic network.
+///
+/// This trait is readily implemented for tuples of [`Extractor`s](Extractor) on
+/// [`NetworkLanguage`s](NetworkLanguage) and `Vec<Id>` where the nodes are taken as the best enodes
+/// of the respective eclass and the output ids are taken from the `Vec`. IDs are converted via
+/// `egg::Id::from(id as usize)` and vice versa.
 pub trait Provider<N: Network> {
+    /// Returns an iterator containing the ids of the output nodes of the underlying network.
     fn outputs(&self) -> impl Iterator<Item = u64>;
+    /// Returns the node with the given id.
     fn node(&self, id: u64) -> N;
+    /// Returns an iterator over all nodes that are reachable from an output and their ids.
     fn iter(&self) -> impl Iterator<Item = (u64, N)> + '_ {
         ProviderNodeIterator {
             provider: self,
@@ -30,6 +47,7 @@ pub trait Provider<N: Network> {
             _n: PhantomData,
         }
     }
+    /// Sends this network to the given receiver.
     fn send<R: Receiver<N>>(&self, mut receiver: R) -> R::Result {
         let mut src_to_dest_id = FxHashMap::default();
         let mut path = Vec::new();
@@ -38,8 +56,7 @@ pub trait Provider<N: Network> {
             let mut node = self.node(node_id);
             let mut known_inputs = 0;
             loop {
-                if known_inputs == node.inputs().len() || src_to_dest_id.contains_key(&node_id)
-                {
+                if known_inputs == node.inputs().len() || src_to_dest_id.contains_key(&node_id) {
                     if known_inputs == node.inputs().len() {
                         let dest_node = node.map_inputs(|child| src_to_dest_id[&child]);
                         let dest_node_id = receiver.create_node(dest_node);
@@ -101,13 +118,10 @@ impl<L: NetworkLanguage, A: Analysis<L>> Receiver<L::Network> for EGraph<L, A> {
     }
 
     fn done(self, outputs: &[u64]) -> Self::Result {
-        let mut outputs_vec = Vec::with_capacity(outputs.len());
-        outputs_vec.extend(
-            outputs
-                .iter()
-                .map(|output_id| Id::from(*output_id as usize)),
-        );
-        (self, outputs_vec)
+        (
+            self,
+            Vec::from_iter(outputs.iter().map(|id| Id::from(*id as usize))),
+        )
     }
 }
 

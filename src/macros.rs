@@ -7,7 +7,7 @@ macro_rules! define_network {
             $crate::egg::define_language! {
                 $(#[$meta])*
                 $vis enum [<$name Language>] {
-                    Symbol(u64),
+                    Input(u64),
                     Const(bool),
                     "!" = Not($crate::egg::Id),
                     $($gate_str = $gate([$crate::egg::Id;$fanin])),+,
@@ -16,7 +16,7 @@ macro_rules! define_network {
 
             #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
             $vis enum $name {
-                Symbol(u64),
+                Input(u64),
                 Const(bool),
                 Not(u64),
                 $($gate([u64;$fanin])),+
@@ -35,7 +35,7 @@ macro_rules! define_network {
 
                 fn map_inputs(&self, map: impl Fn(u64) -> u64) -> Self {
                     match self {
-                        Self::Symbol(name) => Self::Symbol(*name),
+                        Self::Input(name) => Self::Input(*name),
                         Self::Const(bool) => Self::Const(*bool),
                         Self::Not(id) => Self::Not(map(*id)),
                         $(Self::$gate(ids) => {
@@ -48,7 +48,7 @@ macro_rules! define_network {
 
                 fn inputs(&self) -> &[u64] {
                     match self {
-                        Self::Symbol(_) => &[],
+                        Self::Input(_) => &[],
                         Self::Const(_) => &[],
                         Self::Not(id) => std::slice::from_ref(id),
                         $(Self::$gate(ids) => ids),+
@@ -96,7 +96,7 @@ macro_rules! define_network {
             impl From<$name> for [<$name Language>] {
                 fn from(node: $name) -> Self {
                     match node {
-                        $name::Symbol(name) => Self::Symbol(name),
+                        $name::Input(name) => Self::Input(name),
                         $name::Const(value) => Self::Const(value),
                         $name::Not(id) => Self::Not($crate::egg::Id::from(id as usize)),
                         $($name::$gate(ids) => {
@@ -111,7 +111,7 @@ macro_rules! define_network {
             impl From<[<$name Language>]> for $name {
                 fn from(node: [<$name Language>]) -> Self {
                     match node {
-                        [<$name Language>]::Symbol(name) => Self::Symbol(name),
+                        [<$name Language>]::Input(name) => Self::Input(name),
                         [<$name Language>]::Const(value) => Self::Const(value),
                         [<$name Language>]::Not(id) => Self::Not(usize::from(id) as u64),
                         $([<$name Language>]::$gate(ids) => {
@@ -126,7 +126,7 @@ macro_rules! define_network {
             #[repr(C)]
             $vis struct [<$name ReceiverFFI>]<R> {
                 data: *mut $crate::libc::c_void,
-                create_symbol: extern "C" fn(*mut $crate::libc::c_void, name: u64) -> u64,
+                create_input: extern "C" fn(*mut $crate::libc::c_void, name: u64) -> u64,
                 create_constant: extern "C" fn (*mut $crate::libc::c_void, value: bool) -> u64,
                 create_not: extern "C" fn (*mut $crate::libc::c_void, id: u64) -> u64,
                 $([<create_ $gate:snake:lower>]: $crate::seq_macro::seq!(N in 1..=$fanin {
@@ -143,7 +143,7 @@ macro_rules! define_network {
                     let data = Box::into_raw(Box::new(receiver));
                     Self {
                         data: data as *mut $crate::libc::c_void,
-                        create_symbol: Self::create_symbol::<Recv>,
+                        create_input: Self::create_input::<Recv>,
                         create_constant: Self::create_constant::<Recv>,
                         create_not: Self::create_not::<Recv>,
                         $([<create_ $gate:snake:lower>]: Self::[<create_ $gate:snake:lower>]::<Recv>),+,
@@ -157,7 +157,7 @@ macro_rules! define_network {
 
                 fn create_node(&mut self, node: $name) -> u64 {
                     match node {
-                        $name::Symbol(name) => (self.create_symbol)(self.data, name),
+                        $name::Input(name) => (self.create_input)(self.data, name),
                         $name::Const(value) => (self.create_constant)(self.data, value),
                         $name::Not(id) => (self.create_not)(self.data, id),
                         $($name::$gate(ids) => {
@@ -174,14 +174,14 @@ macro_rules! define_network {
             }
 
             impl<R> [<$name ReceiverFFI>]<R> {
-                extern "C" fn create_symbol<Recv>(
+                extern "C" fn create_input<Recv>(
                     data: *mut $crate::libc::c_void,
                     name: u64
                 ) -> u64
                 where
                     Recv: $crate::Receiver<$name, Result = R> + 'static
                 {
-                    unsafe { &mut *(data as *mut Recv) }.create_node($name::Symbol(name))
+                    unsafe { &mut *(data as *mut Recv) }.create_node($name::Input(name))
                 }
 
                 extern "C" fn create_constant<Recv>(

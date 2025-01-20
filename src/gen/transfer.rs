@@ -18,7 +18,7 @@ pub fn receiver_struct<N: Network>() -> String {
         struct {ntk}_receiver
         {{
           void* data;
-          uint64_t ( *create_symbol )( void* data, uint64_t name );
+          uint64_t ( *create_input )( void* data, uint64_t name );
           uint64_t ( *create_const )( void* data, bool value );
           uint64_t ( *create_not )( void* data, uint64_t id );{additional_fields}
           result ( *done )( void* data, uint64_t const* roots, size_t roots_size );
@@ -70,7 +70,7 @@ pub fn send_helper<N: Network>() -> String {
           }}
           else if ( ntk.is_pi( node ) )
           {{
-            id = receiver.create_symbol( receiver.data, ntk.pi_index( node ) );
+            id = receiver.create_input( receiver.data, ntk.pi_index( node ) );
           }}
           else if ( ntk.is_constant( node ) )
           {{
@@ -119,7 +119,7 @@ pub fn receive_helper<N: Network>() -> String {
     let mut struct_initializers = String::new();
     let mut impl_methods = formatdoc!(
         r#"
-        inline uint64_t receive_{ntk}_create_symbol( void* data, uint64_t name )
+        inline uint64_t receive_{ntk}_create_input( void* data, uint64_t name )
         {{
           auto const ntk = static_cast<{ntk_type}*>( data );
           while ( ntk->num_pis() <= name )
@@ -184,7 +184,7 @@ pub fn receive_helper<N: Network>() -> String {
         {{
           return {{
               .data = &ntk,
-              .create_symbol = _impl::receive_{ntk}_create_symbol,
+              .create_input = _impl::receive_{ntk}_create_input,
               .create_const = _impl::receive_{ntk}_create_const,
               .create_not = _impl::receive_{ntk}_create_not,{struct_initializers}
               .done = _impl::receive_{ntk}_done,

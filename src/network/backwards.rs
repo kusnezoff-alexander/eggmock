@@ -3,16 +3,19 @@ use crate::{Id, Node, Provider, Receiver, Signal};
 
 pub trait ProviderWithBackwardEdges: Provider {
     fn outputs(&self, id: Id) -> impl Iterator<Item = Id> + '_;
+    fn leafs(&self) -> impl Iterator<Item = Id> + '_;
 }
 
 pub struct ComputedProviderWithBackwardEdges<'a, P: ?Sized> {
     provider: &'a P,
-    backward: FxHashMap<Id, Vec<Id>>
+    backward: FxHashMap<Id, Vec<Id>>,
+    leafs: Vec<Id>,
 }
 
 impl<'a, P: Provider + ?Sized> ComputedProviderWithBackwardEdges<'a, P> {
     pub fn new(provider: &'a P) -> Self {
         let mut backward = FxHashMap::default();
+        let mut leafs = Vec::new();
         for (output_id, output) in provider.iter() {
             let inputs = output.inputs();
             for i in 0..inputs.len() {
@@ -24,8 +27,11 @@ impl<'a, P: Provider + ?Sized> ComputedProviderWithBackwardEdges<'a, P> {
                 }
                 backward.entry(input_id).or_insert_with(Vec::new).push(output_id);
             }
+            if inputs.len() == 0 {
+                leafs.push(output_id);
+            }
         }
-        Self { provider, backward }
+        Self { provider, backward, leafs }
     }
 }
 
@@ -49,5 +55,8 @@ impl<P: Provider + ?Sized> Provider for ComputedProviderWithBackwardEdges<'_, P>
 impl<P: Provider + ?Sized> ProviderWithBackwardEdges for ComputedProviderWithBackwardEdges<'_, P> {
     fn outputs(&self, id: Id) -> impl Iterator<Item=Id> + '_ {
         self.backward.get(&id).into_iter().flat_map(|v| v.iter()).cloned()
+    }
+    fn leafs(&self) -> impl Iterator<Item=Id> + '_ {
+        self.leafs.iter().cloned()
     }
 }

@@ -54,6 +54,9 @@ pub trait Node: 'static + Sized + Clone + Hash + Eq {
     fn map_input_ids(&self, mut map: impl FnMut(Id) -> Signal) -> Self {
         self.map_input_signals(|signal| signal.map_id(&mut map))
     }
+    fn is_leaf(&self) -> bool {
+        self.inputs().is_empty()
+    }
 }
 
 /// Contains the [`Language`] type that can represent a Network.

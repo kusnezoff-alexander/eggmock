@@ -29,6 +29,29 @@ pub fn ffi_header() -> String {
 
         namespace eggmock
         {{
+
+        struct signal
+        {{
+          uint32_t _v;
+
+          signal() : _v(0) {{}}
+          explicit signal( uint32_t value ) : _v( value ) {{}}
+          signal( uint32_t id, bool complemented ) : _v( id ^ ( static_cast<uint32_t>( complemented == 1 ) << 31) ) {{}}
+
+          uint32_t id() const
+          {{
+            return _v & ~( static_cast<uint32_t>( 1 ) << 31 );
+          }}
+          bool is_complemented() const
+          {{
+            return ( _v & ( static_cast<uint32_t>( 1 ) << 31 ) ) != 0;
+          }}
+          signal complement() const
+          {{
+            return signal( _v ^ ( static_cast<uint32_t>( 1 ) << 31 ) );
+          }}
+        }};
+
         {}
         {}
         {}

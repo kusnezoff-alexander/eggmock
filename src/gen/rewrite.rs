@@ -1,4 +1,4 @@
-use crate::Network;
+use crate::{Network};
 use indoc::formatdoc;
 
 pub fn rewrite_struct<N: Network>() -> String {

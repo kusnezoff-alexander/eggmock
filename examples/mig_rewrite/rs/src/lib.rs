@@ -1,7 +1,4 @@
-use eggmock::{
-    egg::{rewrite, CostFunction, EGraph, Extractor, Id, Language, Runner},
-    Mig, MigLanguage, MigReceiverFFI, Provider, Receiver, Rewriter, RewriterFFI,
-};
+use eggmock::{egg::{rewrite, CostFunction, EGraph, Extractor, Id, Language, Runner}, Mig, MigLanguage, MigNode, MigReceiverFFI, Provider, Receiver, Rewriter, RewriterFFI};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -63,7 +60,7 @@ impl Rewriter for ExampleRewriter {
     fn rewrite(
         self,
         (graph, roots): Self::Intermediate,
-        output: impl Receiver<Self::Network, Result = ()>,
+        output: impl Receiver<Node = MigNode, Result = ()>,
     ) {
         let rules = &[
             rewrite!("commute_1"; "(maj ?a ?b ?c)" => "(maj ?b ?a ?c)"),

@@ -3,6 +3,7 @@ mod macros;
 mod network;
 mod rewrite;
 mod transfer;
+mod egg_impls;
 
 pub use egg;
 pub use libc;

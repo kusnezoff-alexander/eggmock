@@ -10,13 +10,13 @@ use crate::{Network, Receiver, ReceiverFFI};
 pub trait Rewriter {
     type Network: Network;
     type Intermediate;
-    type Receiver: Receiver<Self::Network, Result = Self::Intermediate>;
+    type Receiver: Receiver<Node = <Self::Network as Network>::Node, Result = Self::Intermediate>;
 
     fn create_receiver(&mut self) -> Self::Receiver;
     fn rewrite(
         self,
         input: Self::Intermediate,
-        output: impl Receiver<Self::Network, Result = ()>,
+        output: impl Receiver<Node = <Self::Network as Network>::Node, Result = ()>,
     );
 }
 
@@ -34,7 +34,7 @@ impl<N: Network> RewriterFFI<N> {
     pub fn new<R>(mut rewriter: R) -> N::ReceiverFFI<RewriterFFI<N>>
     where
         R: Rewriter<Network = N> + 'static,
-        R::Intermediate: 'static
+        R::Intermediate: 'static,
     {
         N::ReceiverFFI::new(rewriter.create_receiver().map(|result| {
             let data = Box::into_raw(Box::new((rewriter, result)));

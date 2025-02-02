@@ -1,5 +1,6 @@
 #include "eggmock.h"
-#include <mockturtle/mockturtle.hpp>
+#include <mockturtle/io/write_dot.hpp>
+#include <mockturtle/networks/mig.hpp>
 
 using namespace mockturtle;
 using namespace eggmock;

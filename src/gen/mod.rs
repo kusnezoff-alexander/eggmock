@@ -5,8 +5,14 @@ use crate::{Aig, Mig, Network, Xag, Xmg};
 use indoc::formatdoc;
 
 pub fn network_ffi<N: Network>() -> String {
-    format!(
-        "{}{}{}{}{}",
+    formatdoc!(
+        r#"
+        #include <{}>
+        namespace eggmock {{
+        {}{}{}{}{}
+        }}
+        "#,
+        N::MOCKTURTLE_INCLUDE,
         transfer::receiver_struct::<N>(),
         transfer::send_helper::<N>(),
         transfer::receive_helper::<N>(),
@@ -25,11 +31,8 @@ pub fn ffi_header() -> String {
         #include <cstdint>
         #include <stdexcept>
 
-        #include <mockturtle/mockturtle.hpp>
-
         namespace eggmock
         {{
-
         struct signal
         {{
           uint32_t _v;
@@ -51,12 +54,12 @@ pub fn ffi_header() -> String {
             return signal( _v ^ ( static_cast<uint32_t>( 1 ) << 31 ) );
           }}
         }};
+        }}
 
         {}
         {}
         {}
         {}
-        }}
         "#,
         env!("CARGO_PKG_VERSION"),
         network_ffi::<Mig>(),

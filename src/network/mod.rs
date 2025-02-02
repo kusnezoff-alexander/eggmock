@@ -2,6 +2,12 @@ use super::ReceiverFFI;
 use egg::Language;
 use std::hash::Hash;
 
+mod provider;
+mod backwards;
+
+pub use provider::*;
+pub use backwards::*;
+
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(C)]
 /// References a node in a network.

@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use crate::{Id, Node, Provider, Receiver, Signal};
 
 pub trait ProviderWithBackwardEdges: Provider {
-    fn outputs(&self, id: Id) -> impl Iterator<Item = Id> + '_;
+    fn node_outputs(&self, id: Id) -> impl Iterator<Item = Id> + '_;
     fn leafs(&self) -> impl Iterator<Item = Id> + '_;
 }
 
@@ -53,7 +53,7 @@ impl<P: Provider + ?Sized> Provider for ComputedProviderWithBackwardEdges<'_, P>
 }
 
 impl<P: Provider + ?Sized> ProviderWithBackwardEdges for ComputedProviderWithBackwardEdges<'_, P> {
-    fn outputs(&self, id: Id) -> impl Iterator<Item=Id> + '_ {
+    fn node_outputs(&self, id: Id) -> impl Iterator<Item=Id> + '_ {
         self.backward.get(&id).into_iter().flat_map(|v| v.iter()).cloned()
     }
     fn leafs(&self) -> impl Iterator<Item=Id> + '_ {

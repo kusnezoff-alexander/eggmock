@@ -2,11 +2,11 @@ use super::ReceiverFFI;
 use egg::Language;
 use std::hash::Hash;
 
-mod provider;
 mod backwards;
+mod provider;
 
-pub use provider::*;
 pub use backwards::*;
+pub use provider::*;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(C)]
@@ -88,11 +88,17 @@ impl Signal {
     const NOT_MASK: u32 = 1 << 31;
 
     pub fn new(id: Id, inverted: bool) -> Signal {
-        Signal(id.0 ^ ((inverted as u32) << 31))
+        Signal(id.0).maybe_invert(inverted)
     }
 
     pub fn is_inverted(&self) -> bool {
         self.0 & Self::NOT_MASK != 0
+    }
+    pub fn maybe_invert(&self, invert: bool) -> Signal {
+        Signal(self.0 ^ ((invert as u32) << 31))
+    }
+    pub fn invert(&self) -> Signal {
+        self.maybe_invert(true)
     }
     pub fn node_id(&self) -> Id {
         Id(self.0 & !Self::NOT_MASK)

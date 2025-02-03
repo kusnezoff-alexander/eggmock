@@ -20,7 +20,7 @@ macro_rules! define_network {
                 $(#[$meta])*
                 $vis enum [<$name Language>] {
                     Input(u64),
-                    Const(bool),
+                    "f" = False,
                     "!" = Not($crate::egg::Id),
                     $($gate_str = $gate([$crate::egg::Id;$fanin])),+,
                 }
@@ -29,7 +29,7 @@ macro_rules! define_network {
             #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
             $vis enum [<$name Node>] {
                 Input(u64),
-                Const(bool),
+                False,
                 $($gate([$crate::Signal;$fanin])),+
             }
 
@@ -54,7 +54,7 @@ macro_rules! define_network {
                 fn map_input_signals(&self, mut map: impl FnMut(Signal) -> Signal) -> Self {
                     match self {
                         Self::Input(name) => Self::Input(*name),
-                        Self::Const(bool) => Self::Const(*bool),
+                        Self::False => Self::False,
                         $(Self::$gate(signals) => {
                             $crate::seq_macro::seq!(N in 0..$fanin {
                                 Self::$gate([#(map(signals[N]),)*])
@@ -66,7 +66,7 @@ macro_rules! define_network {
                 fn inputs(&self) -> &[Signal] {
                     match self {
                         Self::Input(_) => &[],
-                        Self::Const(_) => &[],
+                        Self::False => &[],
                         $(Self::$gate(ids) => ids),+
                     }
                 }
@@ -81,7 +81,7 @@ macro_rules! define_network {
                 ) -> Self {
                     match node {
                         [<$name Node>]::Input(id) => Self::Input(id),
-                        [<$name Node>]::Const(c) => Self::Const(c),
+                        [<$name Node>]::False => Self::False,
                         $(
                         [<$name Node>]::$gate(ids) => Self::$gate(
                             $crate::seq_macro::seq!(N in 0..$fanin {
@@ -98,7 +98,7 @@ macro_rules! define_network {
                 ) -> Option<[<$name Node>]> {
                     match self {
                         Self::Input(id) => Some([<$name Node>]::Input(*id)),
-                        Self::Const(bool) => Some([<$name Node>]::Const(*bool)),
+                        Self::False => Some([<$name Node>]::False),
                         Self::Not(_) => None,
                         $(
                         Self::$gate(ids) => Some([<$name Node>]::$gate(
@@ -191,7 +191,7 @@ macro_rules! define_network {
                 fn create_node(&mut self, node: [<$name Node>]) -> $crate::Signal {
                     match node {
                         [<$name Node>]::Input(name) => (self.create_input)(self.data, name),
-                        [<$name Node>]::Const(value) => (self.create_constant)(self.data, value),
+                        [<$name Node>]::False => (self.create_constant)(self.data, false),
                         $([<$name Node>]::$gate(ids) => {
                             $crate::seq_macro::seq!(N in 0..$fanin {
                                 (self.[<create_ $gate:snake:lower>])(self.data, #(ids[N],)*)
@@ -223,7 +223,9 @@ macro_rules! define_network {
                 where
                     Recv: $crate::Receiver<Node = [<$name Node>], Result = R> + 'static
                 {
-                    unsafe { &mut *(data as *mut Recv) }.create_node([<$name Node>]::Const(value))
+                    unsafe { &mut *(data as *mut Recv) }
+                        .create_node([<$name Node>]::False)
+                        .maybe_invert(value)
                 }
 
                 $($crate::seq_macro::seq!(N in 1..=$fanin {

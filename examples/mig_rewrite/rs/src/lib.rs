@@ -29,13 +29,13 @@ impl CostFunction<MigLanguage> for ExampleCostFunction {
     where
         C: FnMut(Id) -> Self::Cost,
     {
-        if let &MigLanguage::Const(_) = enode {
+        if let &MigLanguage::False = enode {
             return ExampleCost(Rc::new(HashSet::from([enode.clone()])));
         }
         let mut set = HashSet::new();
         for child in enode.children() {
             for r in costs(*child).0.iter() {
-                if let MigLanguage::Const(_) = r {
+                if let MigLanguage::False = r {
                     set.insert(enode.clone());
                 } else {
                     set.insert(r.clone());
@@ -65,9 +65,7 @@ impl Rewriter for ExampleRewriter {
         let rules = &[
             rewrite!("commute_1"; "(maj ?a ?b ?c)" => "(maj ?b ?a ?c)"),
             rewrite!("commute_2"; "(maj ?a ?b ?c)" => "(maj ?a ?c ?b)"),
-            rewrite!("not_true"; "(! true)" => "false"),
-            rewrite!("not_false"; "(! false)" => "true" ),
-            rewrite!("example"; "(maj true ?a (maj false ?b ?c))" => "(maj true ?a (maj ?a ?b ?c))"),
+            rewrite!("example"; "(maj (! f) ?a (maj f ?b ?c))" => "(maj (! f) ?a (maj ?a ?b ?c))"),
         ];
         let runner = Runner::default()
             .with_time_limit(Duration::from_secs(60))

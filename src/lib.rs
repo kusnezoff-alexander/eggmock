@@ -13,6 +13,7 @@ pub use seq_macro;
 pub use network::*;
 pub use rewrite::*;
 pub use transfer::*;
+pub use egg_impls::*;
 
 pub use gen::*;
 

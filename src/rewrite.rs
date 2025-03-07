@@ -10,9 +10,10 @@ use crate::{Network, Receiver, ReceiverFFI};
 pub trait Rewriter {
     type Network: Network;
     type Intermediate;
-    type Receiver: Receiver<Node = <Self::Network as Network>::Node, Result = Self::Intermediate>;
 
-    fn create_receiver(&mut self) -> Self::Receiver;
+    fn create_receiver(
+        &mut self,
+    ) -> impl Receiver<Node = <Self::Network as Network>::Node, Result = Self::Intermediate> + 'static;
     fn rewrite(
         self,
         input: Self::Intermediate,

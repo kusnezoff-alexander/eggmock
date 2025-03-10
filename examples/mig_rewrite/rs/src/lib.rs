@@ -1,4 +1,7 @@
-use eggmock::{egg::{rewrite, CostFunction, EGraph, Extractor, Id, Language, Runner}, Mig, MigLanguage, MigNode, MigReceiverFFI, Provider, Receiver, Rewriter, RewriterFFI};
+use eggmock::{
+    egg::{rewrite, CostFunction, EGraph, Extractor, Id, Language, Runner},
+    Mig, MigLanguage, MigNode, MigReceiverFFI, Provider, Receiver, Rewriter, RewriterFFI,
+};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -51,9 +54,10 @@ struct ExampleRewriter;
 impl Rewriter for ExampleRewriter {
     type Network = Mig;
     type Intermediate = (EGraph<MigLanguage, ()>, Vec<Id>);
-    type Receiver = EGraph<MigLanguage, ()>;
 
-    fn create_receiver(&mut self) -> Self::Receiver {
+    fn create_receiver(
+        &mut self,
+    ) -> impl Receiver<Node = MigNode, Result = Self::Intermediate> + 'static {
         EGraph::new(())
     }
 

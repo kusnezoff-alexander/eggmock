@@ -1,8 +1,8 @@
-use crate::{Network};
+use crate::Node;
 use indoc::formatdoc;
 
-pub fn rewrite_struct<N: Network>() -> String {
-    let ntk = N::TYPENAME;
+pub fn rewrite_struct<N: Node>() -> String {
+    let ntk = N::NTK_TYPENAME;
     formatdoc!(
         r#"
         struct {ntk}_rewrite
@@ -14,9 +14,9 @@ pub fn rewrite_struct<N: Network>() -> String {
     )
 }
 
-pub fn rewrite_helper<N: Network>() -> String {
-    let ntk = N::TYPENAME;
-    let ntk_type = format!("mockturtle::{}", N::MOCKTURTLE_TYPENAME);
+pub fn rewrite_helper<N: Node>() -> String {
+    let ntk = N::NTK_TYPENAME;
+    let ntk_type = format!("mockturtle::{}", N::NTK_MOCKTURTLE_TYPENAME);
     formatdoc!(
         r#"
         inline {ntk_type} rewrite_{ntk}( {ntk_type} const& in_ntk, {ntk}_receiver<{ntk}_rewrite> const& receiver )

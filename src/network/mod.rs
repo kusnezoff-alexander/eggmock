@@ -19,30 +19,24 @@ pub struct Id(u32);
 /// inverted.
 pub struct Signal(u32);
 
-pub trait Network: Sized + 'static {
-    /// The node type of this network.
-    type Node: Node<Network = Self>;
+/// Describes a node of a logic network. This includes PIs, constant nodes and gates.
+pub trait Node: 'static + Sized + Clone + Hash + Eq {
     /// The type that contains descriptions of the gate types in this network.
-    type Gates: GateType<Network = Self>;
+    type Gates: GateType<Node = Self>;
     /// An *egg* Language that can represent networks of this type.
-    type Language: NetworkLanguage<Network = Self>;
+    type Language: NetworkLanguage<Node = Self>;
     /// The type that contains function pointers to transfer a network of this type to or from a C++
     /// library using the [`Receiver`](crate::Receiver) trait on the Rust-side.
-    type ReceiverFFI<R>: ReceiverFFI<Node = Self::Node, Result = R>;
+    type ReceiverFFI<R>: ReceiverFFI<Node = Self, Result = R>;
 
     /// A snake_case name for this network type, which is used to name things in the generated C
     /// code (e.g. `"aig"` for AIGs).
-    const TYPENAME: &'static str;
+    const NTK_TYPENAME: &'static str;
     /// The name of the equivalent network type in *mockturtle* (e.g. `aig_network` for
     /// [`Aig`](crate::Aig)).
-    const MOCKTURTLE_TYPENAME: &'static str;
+    const NTK_MOCKTURTLE_TYPENAME: &'static str;
     /// The header file for this network type in *mockturtle* (e.g. `mockturtle/networks/aig.hpp`)
-    const MOCKTURTLE_INCLUDE: &'static str;
-}
-
-/// Describes a node of a logic network. This includes PIs, constant nodes and gates.
-pub trait Node: 'static + Sized + Clone + Hash + Eq {
-    type Network: Network<Node = Self>;
+    const NTK_MOCKTURTLE_INCLUDE: &'static str;
 
     /// Returns the same type of node but with the input signals mapped with the given function.
     fn map_input_signals(&self, map: impl FnMut(Signal) -> Signal) -> Self;
@@ -61,12 +55,12 @@ pub trait Node: 'static + Sized + Clone + Hash + Eq {
 
 /// Contains the [`Language`] type that can represent a Network.
 pub trait NetworkLanguage: Language {
-    type Network: Network;
+    type Node: Node;
 
     /// Creates an instance of this type given a node of the network. The input signals are mapped
     /// to child ids with the given mapper.
     fn from_node(
-        node: <Self::Network as Network>::Node,
+        node: Self::Node,
         signal_mapper: impl FnMut(Signal) -> egg::Id,
     ) -> Self;
     /// Creates a network node from this EGraph node. The child ids are mapped to signals with the
@@ -76,7 +70,7 @@ pub trait NetworkLanguage: Language {
     fn to_node(
         &self,
         id_mapper: impl FnMut(egg::Id) -> Signal,
-    ) -> Option<<Self::Network as Network>::Node>;
+    ) -> Option<Self::Node>;
 
     /// Returns true iff this node is a not.
     fn is_not(&self) -> bool;
@@ -118,7 +112,7 @@ impl Signal {
 
 /// Contains description of the gates in a network, which is used for code generation.
 pub trait GateType: 'static + Sized {
-    type Network: Network<Gates = Self>;
+    type Node: Node<Gates = Self>;
 
     /// Contains all gate types of the associated Network type.
     const VARIANTS: &'static [Self];

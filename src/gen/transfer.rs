@@ -1,8 +1,8 @@
 use super::*;
-use crate::{GateType, Network};
+use crate::{GateType, Node};
 
-pub fn receiver_struct<N: Network>() -> String {
-    let ntk = N::TYPENAME;
+pub fn receiver_struct<N: Node>() -> String {
+    let ntk = N::NTK_TYPENAME;
     let mut additional_fields = "".to_string();
     for gate in N::Gates::VARIANTS {
         additional_fields += format!(
@@ -26,9 +26,9 @@ pub fn receiver_struct<N: Network>() -> String {
     )
 }
 
-pub fn send_helper<N: Network>() -> String {
-    let ntk = N::TYPENAME;
-    let ntk_type = format!("mockturtle::{}", N::MOCKTURTLE_TYPENAME);
+pub fn send_helper<N: Node>() -> String {
+    let ntk = N::NTK_TYPENAME;
+    let ntk_type = format!("mockturtle::{}", N::NTK_MOCKTURTLE_TYPENAME);
     let mut gate_cases = "".to_string();
     for gate in N::Gates::VARIANTS {
         let fanin = gate.fanin();
@@ -110,9 +110,9 @@ pub fn send_helper<N: Network>() -> String {
     )
 }
 
-pub fn receive_helper<N: Network>() -> String {
-    let ntk = N::TYPENAME;
-    let ntk_type = format!("mockturtle::{}", N::MOCKTURTLE_TYPENAME);
+pub fn receive_helper<N: Node>() -> String {
+    let ntk = N::NTK_TYPENAME;
+    let ntk_type = format!("mockturtle::{}", N::NTK_MOCKTURTLE_TYPENAME);
 
     let mut struct_initializers = String::new();
     let mut impl_methods = formatdoc!(

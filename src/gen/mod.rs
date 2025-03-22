@@ -1,10 +1,10 @@
 mod rewrite;
 mod transfer;
 
-use crate::{Aig, Mig, Network, Xag, Xmg};
+use crate::{Aig, Mig, Node, Xag, Xmg};
 use indoc::formatdoc;
 
-pub fn network_ffi<N: Network>() -> String {
+pub fn network_ffi<N: Node>() -> String {
     formatdoc!(
         r#"
         #include <{}>
@@ -12,7 +12,7 @@ pub fn network_ffi<N: Network>() -> String {
         {}{}{}{}{}
         }}
         "#,
-        N::MOCKTURTLE_INCLUDE,
+        N::NTK_MOCKTURTLE_INCLUDE,
         transfer::receiver_struct::<N>(),
         transfer::send_helper::<N>(),
         transfer::receive_helper::<N>(),

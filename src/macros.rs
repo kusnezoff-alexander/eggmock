@@ -13,7 +13,7 @@
 #[macro_export]
 macro_rules! define_network {
     ($(#[$meta:meta])* $vis:vis enum $mockturtle_ntk:literal = $name:ident {
-        $($gate_str:literal = $gate:ident($fanin:literal, $mockturtle_create:ident, $mockturtle_is:ident)),+
+        $($gate_str:literal = $gate:ident($fanin:literal)),+
     }) => {
         $crate::paste::paste! {
             $crate::egg::define_language! {
@@ -27,29 +27,22 @@ macro_rules! define_network {
             }
 
             #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-            $vis enum [<$name Node>] {
+            $vis enum $name {
                 Input(u64),
                 False,
                 $($gate([$crate::Signal;$fanin])),+
             }
 
-            $vis struct $name;
-
-            impl $crate::Network for $name {
-                type Node = [<$name Node>];
+            impl $crate::Node for $name {
                 type Gates = $crate::paste::paste!([<$name GateType>]);
                 type Language = [<$name Language>];
                 type ReceiverFFI<R> = [<$name ReceiverFFI>]<R>;
 
-                const TYPENAME: &'static str = stringify!([<$name:snake:lower>]);
-                const MOCKTURTLE_TYPENAME: &'static str = concat!($mockturtle_ntk, "_network");
-                const MOCKTURTLE_INCLUDE: &'static str = concat!(
+                const NTK_TYPENAME: &'static str = stringify!([<$name:snake:lower>]);
+                const NTK_MOCKTURTLE_TYPENAME: &'static str = concat!($mockturtle_ntk, "_network");
+                const NTK_MOCKTURTLE_INCLUDE: &'static str = concat!(
                     "mockturtle/networks/", $mockturtle_ntk, ".hpp"
                 );
-            }
-
-            impl $crate::Node for [<$name Node>] {
-                type Network = $name;
 
                 fn map_input_signals(&self, mut map: impl FnMut(Signal) -> Signal) -> Self {
                     match self {
@@ -73,17 +66,17 @@ macro_rules! define_network {
             }
 
             impl NetworkLanguage for [<$name Language>] {
-                type Network = $name;
+                type Node = $name;
 
                 fn from_node(
-                    node: [<$name Node>],
+                    node: $name,
                     mut signal_mapper: impl FnMut(Signal) -> egg::Id,
                 ) -> Self {
                     match node {
-                        [<$name Node>]::Input(id) => Self::Input(id),
-                        [<$name Node>]::False => Self::False,
+                        $name::Input(id) => Self::Input(id),
+                        $name::False => Self::False,
                         $(
-                        [<$name Node>]::$gate(ids) => Self::$gate(
+                        $name::$gate(ids) => Self::$gate(
                             $crate::seq_macro::seq!(N in 0..$fanin {
                                 [#(signal_mapper(ids[N]),)*]
                             })
@@ -95,13 +88,13 @@ macro_rules! define_network {
                 fn to_node(
                     &self,
                     mut id_mapper: impl FnMut(egg::Id) -> Signal
-                ) -> Option<[<$name Node>]> {
+                ) -> Option<$name> {
                     match self {
-                        Self::Input(id) => Some([<$name Node>]::Input(*id)),
-                        Self::False => Some([<$name Node>]::False),
+                        Self::Input(id) => Some($name::Input(*id)),
+                        Self::False => Some($name::False),
                         Self::Not(_) => None,
                         $(
-                        Self::$gate(ids) => Some([<$name Node>]::$gate(
+                        Self::$gate(ids) => Some($name::$gate(
                             $crate::seq_macro::seq!(N in 0..$fanin {
                                 [#(id_mapper(ids[N]),)*]
                             })
@@ -127,7 +120,7 @@ macro_rules! define_network {
             }
 
             impl $crate::GateType for [<$name GateType>] {
-                type Network = $name;
+                type Node = $name;
                 const VARIANTS: &'static [Self] = &[
                     $(Self::$gate),+
                 ];
@@ -146,13 +139,13 @@ macro_rules! define_network {
 
                 fn mockturtle_create(&self) -> &'static str {
                     match self {
-                        $(Self::$gate => stringify!($mockturtle_create)),+
+                        $(Self::$gate => concat!("create_", $gate_str)),+
                     }
                 }
 
                 fn mockturtle_is(&self) -> &'static str {
                     match self {
-                        $(Self::$gate => stringify!($mockturtle_is)),+
+                        $(Self::$gate => concat!("is_", $gate_str)),+
                     }
                 }
             }
@@ -171,7 +164,7 @@ macro_rules! define_network {
             impl<R> $crate::ReceiverFFI for [<$name ReceiverFFI>]<R> {
                 fn new<Recv>(receiver: Recv) -> Self
                 where
-                    Recv: $crate::Receiver<Node = [<$name Node>], Result = R> + 'static
+                    Recv: $crate::Receiver<Node = $name, Result = R> + 'static
                 {
                     let data = Box::into_raw(Box::new(receiver));
                     Self {
@@ -185,14 +178,14 @@ macro_rules! define_network {
             }
 
             impl<R> $crate::Receiver for [<$name ReceiverFFI>]<R> {
-                type Node = [<$name Node>];
+                type Node = $name;
                 type Result = R;
 
-                fn create_node(&mut self, node: [<$name Node>]) -> $crate::Signal {
+                fn create_node(&mut self, node: $name) -> $crate::Signal {
                     match node {
-                        [<$name Node>]::Input(name) => (self.create_input)(self.data, name),
-                        [<$name Node>]::False => (self.create_constant)(self.data, false),
-                        $([<$name Node>]::$gate(ids) => {
+                        $name::Input(name) => (self.create_input)(self.data, name),
+                        $name::False => (self.create_constant)(self.data, false),
+                        $($name::$gate(ids) => {
                             $crate::seq_macro::seq!(N in 0..$fanin {
                                 (self.[<create_ $gate:snake:lower>])(self.data, #(ids[N],)*)
                             })
@@ -211,9 +204,9 @@ macro_rules! define_network {
                     name: u64
                 ) -> $crate::Signal
                 where
-                    Recv: $crate::Receiver<Node = [<$name Node>], Result = R> + 'static
+                    Recv: $crate::Receiver<Node = $name, Result = R> + 'static
                 {
-                    unsafe { &mut *(data as *mut Recv) }.create_node([<$name Node>]::Input(name))
+                    unsafe { &mut *(data as *mut Recv) }.create_node($name::Input(name))
                 }
 
                 extern "C" fn create_constant<Recv>(
@@ -221,10 +214,10 @@ macro_rules! define_network {
                     value: bool
                 ) -> $crate::Signal
                 where
-                    Recv: $crate::Receiver<Node = [<$name Node>], Result = R> + 'static
+                    Recv: $crate::Receiver<Node = $name, Result = R> + 'static
                 {
                     unsafe { &mut *(data as *mut Recv) }
-                        .create_node([<$name Node>]::False)
+                        .create_node($name::False)
                         .maybe_invert(value)
                 }
 
@@ -234,9 +227,9 @@ macro_rules! define_network {
                         #(, input~N: $crate::Signal)*
                     ) -> $crate::Signal
                     where
-                        Recv: $crate::Receiver<Node = [<$name Node>], Result = R> + 'static
+                        Recv: $crate::Receiver<Node = $name, Result = R> + 'static
                     {
-                        unsafe { &mut *(data as *mut Recv) }.create_node([<$name Node>]::$gate([#(input~N,)*]))
+                        unsafe { &mut *(data as *mut Recv) }.create_node($name::$gate([#(input~N,)*]))
                     }
                 });)+
 
@@ -246,7 +239,7 @@ macro_rules! define_network {
                     outputs_size: usize,
                 ) -> R
                 where
-                    Recv: $crate::Receiver<Node = [<$name Node>], Result = R> + 'static
+                    Recv: $crate::Receiver<Node = $name, Result = R> + 'static
                 {
                     let outputs = if outputs_size == 0 {
                         &[]

@@ -1,6 +1,6 @@
 use std::ops::Index;
 use egg::{Analysis, CostFunction, EGraph, Extractor, Language};
-use crate::{Id, Network, NetworkLanguage, Provider, Receiver, Signal};
+use crate::{Id, NetworkLanguage, Provider, Receiver, Signal};
 
 fn egraph_id_for_signal<L: NetworkLanguage, A: Analysis<L>>(
     graph: &mut EGraph<L, A>,
@@ -15,7 +15,7 @@ fn egraph_id_for_signal<L: NetworkLanguage, A: Analysis<L>>(
 }
 
 impl<L: NetworkLanguage, A: Analysis<L>> Receiver for EGraph<L, A> {
-    type Node = <L::Network as Network>::Node;
+    type Node = L::Node;
     type Result = (Self, Vec<egg::Id>);
 
     fn create_node(&mut self, node: Self::Node) -> Signal {
@@ -36,7 +36,7 @@ impl<L: NetworkLanguage, A: Analysis<L>> Receiver for EGraph<L, A> {
 impl<L: NetworkLanguage, CF: CostFunction<L>, A: Analysis<L>> Provider
 for (Extractor<'_, CF, L, A>, Vec<egg::Id>)
 {
-    type Node = <L::Network as Network>::Node;
+    type Node = L::Node;
 
     fn outputs(&self) -> impl Iterator<Item = Signal> {
         self.1

@@ -1,6 +1,6 @@
 use eggmock::{
     egg::{rewrite, CostFunction, EGraph, Extractor, Id, Language, Runner},
-    Mig, MigLanguage, MigNode, MigReceiverFFI, Provider, Receiver, Rewriter, RewriterFFI,
+    Mig, MigLanguage, MigReceiverFFI, Provider, Receiver, Rewriter, RewriterFFI,
 };
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -52,19 +52,19 @@ impl CostFunction<MigLanguage> for ExampleCostFunction {
 struct ExampleRewriter;
 
 impl Rewriter for ExampleRewriter {
-    type Network = Mig;
+    type Node = Mig;
     type Intermediate = (EGraph<MigLanguage, ()>, Vec<Id>);
 
     fn create_receiver(
         &mut self,
-    ) -> impl Receiver<Node = MigNode, Result = Self::Intermediate> + 'static {
+    ) -> impl Receiver<Node = Mig, Result = Self::Intermediate> + 'static {
         EGraph::new(())
     }
 
     fn rewrite(
         self,
         (graph, roots): Self::Intermediate,
-        output: impl Receiver<Node = MigNode, Result = ()>,
+        output: impl Receiver<Node = Mig, Result = ()>,
     ) {
         let rules = &[
             rewrite!("commute_1"; "(maj ?a ?b ?c)" => "(maj ?b ?a ?c)"),

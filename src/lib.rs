@@ -19,26 +19,26 @@ pub use gen::*;
 
 define_network! {
     pub enum "mig" = Mig {
-        "maj" = Maj(3, create_maj, is_maj)
+        "maj" = Maj(3)
     }
 }
 
 define_network! {
     pub enum "aig" = Aig {
-        "*" = And(2, create_and, is_and)
+        "and" = And(2)
     }
 }
 
 define_network! {
     pub enum "xag" = Xag {
-        "*" = And(2, create_and, is_and),
-        "xor" = Xor(2, create_xor, is_xor)
+        "and" = And(2),
+        "xor" = Xor(2)
     }
 }
 
 define_network! {
     pub enum "xmg" = Xmg {
-        "xor" = Xor(2, create_xor, is_xor),
-        "maj" = Maj(3, create_maj, is_maj)
+        "xor" = Xor(2),
+        "maj" = Maj(3)
     }
 }

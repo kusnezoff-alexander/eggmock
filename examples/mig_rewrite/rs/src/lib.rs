@@ -1,6 +1,6 @@
 use eggmock::{
     egg::{rewrite, CostFunction, EGraph, Extractor, Id, Language, Runner},
-    Mig, MigLanguage, MigReceiverFFI, Provider, Receiver, Rewriter, RewriterFFI,
+    Mig, MigLanguage, MigReceiverFFI, Network, Receiver, Rewriter, RewriterFFI,
 };
 use std::cmp::Ordering;
 use std::collections::HashSet;

@@ -1,6 +1,6 @@
 use std::ops::Index;
 use egg::{Analysis, CostFunction, EGraph, Extractor, Language};
-use crate::{Id, NetworkLanguage, Provider, Receiver, Signal};
+use crate::{Id, NetworkLanguage, Network, Receiver, Signal};
 
 fn egraph_id_for_signal<L: NetworkLanguage, A: Analysis<L>>(
     graph: &mut EGraph<L, A>,
@@ -33,7 +33,7 @@ impl<L: NetworkLanguage, A: Analysis<L>> Receiver for EGraph<L, A> {
     }
 }
 
-impl<L: NetworkLanguage, CF: CostFunction<L>, A: Analysis<L>> Provider
+impl<L: NetworkLanguage, CF: CostFunction<L>, A: Analysis<L>> Network
 for (Extractor<'_, CF, L, A>, Vec<egg::Id>)
 {
     type Node = L::Node;

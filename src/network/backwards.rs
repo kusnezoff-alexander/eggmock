@@ -1,22 +1,22 @@
 use rustc_hash::FxHashMap;
-use crate::{Id, Node, Provider, Receiver, Signal};
+use crate::{Id, Node, Network, Receiver, Signal};
 
-pub trait ProviderWithBackwardEdges: Provider {
+pub trait NetworkWithBackwardEdges: Network {
     fn node_outputs(&self, id: Id) -> impl Iterator<Item = Id> + '_;
     fn leafs(&self) -> impl Iterator<Item = Id> + '_;
 }
 
-pub struct ComputedProviderWithBackwardEdges<'a, P: ?Sized> {
-    provider: &'a P,
+pub struct ComputedNetworkWithBackwardEdges<'a, P: ?Sized> {
+    network: &'a P,
     backward: FxHashMap<Id, Vec<Id>>,
     leafs: Vec<Id>,
 }
 
-impl<'a, P: Provider + ?Sized> ComputedProviderWithBackwardEdges<'a, P> {
-    pub fn new(provider: &'a P) -> Self {
+impl<'a, P: Network + ?Sized> ComputedNetworkWithBackwardEdges<'a, P> {
+    pub fn new(network: &'a P) -> Self {
         let mut backward = FxHashMap::default();
         let mut leafs = Vec::new();
-        for (output_id, output) in provider.iter() {
+        for (output_id, output) in network.iter() {
             let inputs = output.inputs();
             for i in 0..inputs.len() {
                 let input_signal = inputs[i];
@@ -31,28 +31,28 @@ impl<'a, P: Provider + ?Sized> ComputedProviderWithBackwardEdges<'a, P> {
                 leafs.push(output_id);
             }
         }
-        Self { provider, backward, leafs }
+        Self { network, backward, leafs }
     }
 }
 
-impl<P: Provider + ?Sized> Provider for ComputedProviderWithBackwardEdges<'_, P> {
+impl<P: Network + ?Sized> Network for ComputedNetworkWithBackwardEdges<'_, P> {
     type Node = P::Node;
 
     fn outputs(&self) -> impl Iterator<Item=Signal> {
-        self.provider.outputs()
+        self.network.outputs()
     }
     fn node(&self, id: Id) -> Self::Node {
-        self.provider.node(id)
+        self.network.node(id)
     }
     fn iter(&self) -> impl Iterator<Item=(Id, Self::Node)> + '_ {
-        self.provider.iter()
+        self.network.iter()
     }
     fn send<R: Receiver<Node=Self::Node>>(&self, receiver: R) -> R::Result {
-        self.provider.send(receiver)
+        self.network.send(receiver)
     }
 }
 
-impl<P: Provider + ?Sized> ProviderWithBackwardEdges for ComputedProviderWithBackwardEdges<'_, P> {
+impl<P: Network + ?Sized> NetworkWithBackwardEdges for ComputedNetworkWithBackwardEdges<'_, P> {
     fn node_outputs(&self, id: Id) -> impl Iterator<Item=Id> + '_ {
         self.backward.get(&id).into_iter().flat_map(|v| v.iter()).cloned()
     }

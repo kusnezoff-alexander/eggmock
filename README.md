@@ -9,7 +9,7 @@ Currently, *eggmock* supports AIGs, MIGs, XMGs and XAGs.
 ## Prerequisites
 
 To use *eggmock*, you need
-- a modern C++ compiler and CMake 
+- a modern C++ compiler and CMake
 - a working Rust installation
 
 If you want to test out if everything works as intended, you can run an example:
@@ -21,6 +21,7 @@ cmake ..
 make mig_rewrite
 ./examples/mig_rewrite/mig_rewrite
 ```
+- make sure to run `git submodule update --init --recursive` beforehand !
 
 This will create two files:
 - `in.dot` contains the logic network that was passed from mockturtle to egg

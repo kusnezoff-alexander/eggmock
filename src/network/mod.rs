@@ -3,6 +3,7 @@ use crate::Receiver;
 use super::ReceiverFFI;
 use egg::Language;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::fmt::Debug;
 use std::hash::Hash;
 
 mod backwards;
@@ -14,14 +15,14 @@ pub use backwards::*;
 /// References a node in a network.
 pub struct Id(u32);
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(C)]
 /// References a node by its id with a flag that indicates whether the signal from this node is
 /// inverted.
 pub struct Signal(u32);
 
 /// Describes a node of a logic network. This includes PIs, constant nodes and gates.
-pub trait Node: 'static + Sized + Clone + Hash + Eq {
+pub trait Node: 'static + Debug + Sized + Clone + Hash + Eq {
     /// The type that contains descriptions of the gate types in this network.
     type Gates: GateType<Node = Self>;
     /// An *egg* Language that can represent networks of this type.
@@ -60,18 +61,12 @@ pub trait NetworkLanguage: Language {
 
     /// Creates an instance of this type given a node of the network. The input signals are mapped
     /// to child ids with the given mapper.
-    fn from_node(
-        node: Self::Node,
-        signal_mapper: impl FnMut(Signal) -> egg::Id,
-    ) -> Self;
+    fn from_node(node: Self::Node, signal_mapper: impl FnMut(Signal) -> egg::Id) -> Self;
     /// Creates a network node from this EGraph node. The child ids are mapped to signals with the
     /// given mapper. This mapper will usually resolve the nots before the next real network node.
     ///
     /// Returns [`None`] if this EGraph node is a not.
-    fn to_node(
-        &self,
-        id_mapper: impl FnMut(egg::Id) -> Signal,
-    ) -> Option<Self::Node>;
+    fn to_node(&self, id_mapper: impl FnMut(egg::Id) -> Signal) -> Option<Self::Node>;
 
     /// Returns true iff this node is a not.
     fn is_not(&self) -> bool;
@@ -130,6 +125,15 @@ pub trait GateType: 'static + Sized {
     /// Returns the name of the method on the *mockturtle* network implementation that checks
     /// whether a given node ID belongs to a gate of this type (e.g. `"is_and"`).
     fn mockturtle_is(&self) -> &'static str;
+}
+
+impl Debug for Signal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Signal")
+            .field(&self.is_inverted())
+            .field(&self.node_id())
+            .finish()
+    }
 }
 
 impl From<egg::Id> for Id {
@@ -211,6 +215,12 @@ pub trait Network {
     fn with_backward_edges(&self) -> impl NetworkWithBackwardEdges<Node = Self::Node> + '_ {
         ComputedNetworkWithBackwardEdges::new(self)
     }
+
+    fn dump(&self) {
+        for (id, node) in self.iter() {
+            println!("{id:?}: {node:?}");
+        }
+    }
 }
 
 struct NetworkNodeIterator<'a, P: ?Sized> {
@@ -229,7 +239,8 @@ impl<P: Network + ?Sized> Iterator for NetworkNodeIterator<'_, P> {
                 continue;
             }
             let node = self.network.node(node_id);
-            self.remaining.extend(node.inputs().iter().map(|s| s.node_id()));
+            self.remaining
+                .extend(node.inputs().iter().map(|s| s.node_id()));
             break Some((node_id, node));
         }
     }

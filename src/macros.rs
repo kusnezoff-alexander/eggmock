@@ -3,34 +3,60 @@
 /// eggmock::define_network! {
 ///     pub enum "xag" = Xag {
 ///         // 2: fanin
-///         // create_and: name of create method in mockturtle
-///         // is_and: name of is method in mockturtle
-///         "*" = And(2, create_and, is_and),
-///         "xor" = Xor(2, create_xor, is_xor)
+///         "*" = And(2),
+///         "xor" = Xor(2)
+///         "xor4" =
 ///     }
 /// }
 /// ```
+///
+/// Auto-implements:
+/// - [<$name Language>] (using [`egg::define_language`])
+/// - `enum $name`: holds language-specific node-types
+///     - eg for `Aig`: Input-Gates (=id of nodes): input, false, and gates: Not, And
+/// - implements [`Node`] for `$name`
+/// - implements  [`NetworkLanguage`] for `[<$name Language>]`, eg for `AigLanguage`
+///     - implemented operands: `"f"` (False), `Input(64)`
+///     - implemented operators: `"!"` (NOT), language-specific gates (eg `"maj"` for MIG, `"and"` for AIG)
+/// - implements [`GateType`] for `[<$name GateType]`
+/// - implements [`ReceiverFFI`] for `[<$name ReceiverFFI>]<R>`
+/// - implements [`Receiver` for [<$name ReceiverFFI>]<R>`
+///
+/// NOTE: see [paste](https://docs.rs/paste/latest/paste/) for understanding `[<...>]` notation
 #[macro_export]
-macro_rules! define_network {
-    ($(#[$meta:meta])* $vis:vis enum $mockturtle_ntk:literal = $name:ident {
-        $($gate_str:literal = $gate:ident($fanin:literal)),+
-    }) => {
+macro_rules! define_network {(
+        $(#[$meta:meta])* $vis:vis enum $mockturtle_ntk:literal = $name:ident {
+            // Binary gates
+            gates {
+                $($gate_str:literal = $gate:ident($fanin:literal)),* $(,)?
+            }
+            // N-ary gates
+            $(nary_gates {
+                $($gate_nary_str:literal = $gate_nary:ident($fanin_nary:literal)),* $(,)?
+            })*
+        }
+    ) => {
         $crate::paste::paste! {
             $crate::egg::define_language! {
+                /// Define Language (to be used in egg)
+                /// - basically a string-representation of the graph
                 $(#[$meta])*
                 $vis enum [<$name Language>] {
-                    Input(u64),
+                    Input(u64), // TODO: change `u64` to `Signal`??
                     "f" = False,
                     "!" = Not($crate::egg::Id),
                     $($gate_str = $gate([$crate::egg::Id;$fanin])),+,
+                    $($gate_nary_str = $gate_nary([$crate::egg::Id;$fanin_nary])),*
                 }
             }
 
+            /// The network `$name` consists of: inputs, false and all network-specific gates (eg AND for AIG)
             #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
             $vis enum $name {
                 Input(u64),
                 False,
                 $($gate([$crate::Signal;$fanin])),+
+                $($gate_nary([$crate::Signal;$fanin_nary])),*
             }
 
             impl $crate::Node for $name {
@@ -65,6 +91,7 @@ macro_rules! define_network {
                 }
             }
 
+            /// For Conversion btw representation in `mockturtle` (nodes) and representation in `egg` (as Signals)
             impl NetworkLanguage for [<$name Language>] {
                 type Node = $name;
 
@@ -114,42 +141,50 @@ macro_rules! define_network {
                 }
             }
 
+            /// Network-specific gates
             #[derive(Copy, Clone, Eq, PartialEq, Hash)]
             $vis enum [<$name GateType>] {
                 $($gate),+
             }
 
+            /// Each gate in `mockturtle` has a name, fanin
             impl $crate::GateType for [<$name GateType>] {
                 type Node = $name;
                 const VARIANTS: &'static [Self] = &[
                     $(Self::$gate),+
+                    $(Self::$gate_nary),*
                 ];
 
                 fn name(&self) -> &'static str {
                     match self {
                         $(Self::$gate => stringify!([<$gate:snake:lower>])),+
+                        $(Self::$gate_nary => stringify!([<$gate_nary:snake:lower>])),*
                     }
                 }
 
                 fn fanin(&self) -> u8 {
                     match self {
                         $(Self::$gate => $fanin),+
+                        $(Self::$gate_nary => $fanin_nary),*
                     }
                 }
 
                 fn mockturtle_create(&self) -> &'static str {
                     match self {
                         $(Self::$gate => concat!("create_", $gate_str)),+
+                        $(Self::$gate_nary => concat!("create_nary_", $gate_nary_str)),*
                     }
                 }
 
                 fn mockturtle_is(&self) -> &'static str {
                     match self {
                         $(Self::$gate => concat!("is_", $gate_str)),+
+                        $(Self::$gate_nary => concat!("is_nary", $gate_nary_str)),*
                     }
                 }
             }
 
+            /// FFI for calling network-specific functions in mockturtle
             #[repr(C)]
             $vis struct [<$name ReceiverFFI>]<R> {
                 data: *mut $crate::libc::c_void,
@@ -158,6 +193,9 @@ macro_rules! define_network {
                 $([<create_ $gate:snake:lower>]: $crate::seq_macro::seq!(N in 1..=$fanin {
                      extern "C" fn(*mut $crate::libc::c_void, #(input~N: $crate::Signal,)*) -> $crate::Signal
                 })),+,
+                $([<create_nary_ $gate_nary:snake:lower>]: $crate::seq_macro::seq!(N in 1..=$fanin_nary {
+                     extern "C" fn(*mut $crate::libc::c_void, #(input~N: $crate::Signal,)*) -> $crate::Signal
+                })),*
                 done: extern "C" fn (*mut $crate::libc::c_void, outputs: *const $crate::Signal, outputs_size: usize) -> R,
             }
 
@@ -172,6 +210,7 @@ macro_rules! define_network {
                         create_input: Self::create_input::<Recv>,
                         create_constant: Self::create_constant::<Recv>,
                         $([<create_ $gate:snake:lower>]: Self::[<create_ $gate:snake:lower>]::<Recv>),+,
+                        $([<create_nary_ $gate_nary:snake:lower>]: Self::[<create_nary_ $gate_nary:snake:lower>]::<Recv>),*
                         done: Self::done::<Recv>,
                     }
                 }
@@ -181,6 +220,8 @@ macro_rules! define_network {
                 type Node = $name;
                 type Result = R;
 
+                /// Wrapper around `.create_*` methods offered for network by mockturtle (and
+                /// exposed via `<$name ReceiverFFI>`
                 fn create_node(&mut self, node: $name) -> $crate::Signal {
                     match node {
                         $name::Input(name) => (self.create_input)(self.data, name),
@@ -190,6 +231,11 @@ macro_rules! define_network {
                                 (self.[<create_ $gate:snake:lower>])(self.data, #(ids[N],)*)
                             })
                         }),+
+                        $($name::$gate_nary(ids) => {
+                            $crate::seq_macro::seq!(N in 0..$fanin_nary {
+                                (self.[<create_ $gate_nary:snake:lower>])(self.data, #(ids[N],)*)
+                            })
+                        }),*
                     }
                 }
 
@@ -198,6 +244,7 @@ macro_rules! define_network {
                 }
             }
 
+            /// FFI for network-specific functions provided by `mockturtle`
             impl<R> [<$name ReceiverFFI>]<R> {
                 extern "C" fn create_input<Recv>(
                     data: *mut $crate::libc::c_void,
@@ -221,6 +268,7 @@ macro_rules! define_network {
                         .maybe_invert(value)
                 }
 
+                // NEXT: TODO !
                 $($crate::seq_macro::seq!(N in 1..=$fanin {
                     pub extern "C" fn [<create_ $gate:snake:lower>]<Recv>(
                         data: *mut $crate::libc::c_void
@@ -232,6 +280,18 @@ macro_rules! define_network {
                         unsafe { &mut *(data as *mut Recv) }.create_node($name::$gate([#(input~N,)*]))
                     }
                 });)+
+
+                $($crate::seq_macro::seq!(N in 1..=$fanin_nary {
+                    pub extern "C" fn [<create_ $gate_nary:snake:lower>]<Recv>(
+                        data: *mut $crate::libc::c_void
+                        #(, input~N: $crate::Signal)*
+                    ) -> $crate::Signal
+                    where
+                        Recv: $crate::Receiver<Node = $name, Result = R> + 'static
+                    {
+                        unsafe { &mut *(data as *mut Recv) }.create_node($name::$gate_nary([#(input~N,)*]))
+                    }
+                });)*
 
                 extern "C" fn done<Recv>(
                     data: *mut $crate::libc::c_void,

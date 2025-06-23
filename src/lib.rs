@@ -19,26 +19,55 @@ pub use gen::*;
 
 define_network! {
     pub enum "mig" = Mig {
-        "maj" = Maj(3)
+        gates {
+            "maj" = Maj(3)
+        }
     }
 }
 
 define_network! {
     pub enum "aig" = Aig {
-        "and" = And(2)
+        gates {
+            "and" = And(2)
+        }
+    }
+}
+
+define_network! {
+    pub enum "aoig" = Aoig {
+        gates {
+            "and" = And(2),
+            "or" = Or(2)
+        }
+        nary_gates {
+            "and2" = And2(2),
+            "and4" = And4(4),
+            "and8" = And8(8),
+            "and16" = And16(16),
+            "and32" = And32(32),
+            "or2" = Or2(2),
+            "or4" = Or4(4),
+            "or8" = Or8(8),
+            "or16" = Or16(16),
+            "or32" = Or32(32)
+        }
     }
 }
 
 define_network! {
     pub enum "xag" = Xag {
-        "and" = And(2),
-        "xor" = Xor(2)
+        gates {
+            "and" = And(2),
+            "xor" = Xor(2)
+        }
     }
 }
 
 define_network! {
     pub enum "xmg" = Xmg {
-        "xor" = Xor(2),
-        "maj" = Maj(3)
+        gates {
+            "xor" = Xor(2),
+            "maj" = Maj(3)
+        }
     }
 }

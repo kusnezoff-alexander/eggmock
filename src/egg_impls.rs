@@ -1,6 +1,7 @@
-use std::ops::Index;
 use egg::{Analysis, CostFunction, EGraph, Extractor, Language};
-use crate::{Id, NetworkLanguage, Network, Receiver, Signal};
+use std::ops::Index;
+
+use crate::{Id, Network, NetworkLanguage, Receiver, Signal};
 
 fn egraph_id_for_signal<L: NetworkLanguage, A: Analysis<L>>(
     graph: &mut EGraph<L, A>,
@@ -34,7 +35,7 @@ impl<L: NetworkLanguage, A: Analysis<L>> Receiver for EGraph<L, A> {
 }
 
 impl<L: NetworkLanguage, CF: CostFunction<L>, A: Analysis<L>> Network
-for (Extractor<'_, CF, L, A>, Vec<egg::Id>)
+    for (Extractor<'_, CF, L, A>, Vec<egg::Id>)
 {
     type Node = L::Node;
 
@@ -57,7 +58,8 @@ pub trait EggIdToSignal {
 }
 
 impl<I: Index<egg::Id, Output: NetworkLanguage>> EggIdToSignal for I {
-    fn to_signal(&self, mut id: egg::Id) -> Signal {
+    fn to_signal(&self, start_id: egg::Id) -> Signal {
+        let mut id = start_id;
         let mut invert = false;
         loop {
             let node = &self[id];
@@ -67,6 +69,7 @@ impl<I: Index<egg::Id, Output: NetworkLanguage>> EggIdToSignal for I {
             } else {
                 break Signal::new(id.into(), invert);
             }
+            assert_ne!(id, start_id, "loop detected")
         }
     }
 }
